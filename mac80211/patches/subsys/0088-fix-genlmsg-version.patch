@@ -1,0 +1,35 @@
+From 787afbf0d2c11a99b2a3a603a1e6fba14cb23626 Mon Sep 17 00:00:00 2001
+From: Peter Chiu <chui-hao.chiu@mediatek.com>
+Date: Tue, 10 Dec 2024 19:36:05 +0800
+Subject: [PATCH] fix genlmsg version
+
+Signed-off-by: Peter Chiu <chui-hao.chiu@mediatek.com>
+Change-Id: Idf28881470efa788224f88e72701b678bc2d50e4
+---
+ backport-include/net/genetlink.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/backport-include/net/genetlink.h b/backport-include/net/genetlink.h
+index 43ca3b43..59a89793 100644
+--- a/backport-include/net/genetlink.h
++++ b/backport-include/net/genetlink.h
+@@ -172,7 +172,7 @@ static inline int genlmsg_parse(const struct nlmsghdr *nlh,
+ }
+ #endif /* LINUX_VERSION_IS_LESS(5,2,0) */
+ 
+-#if LINUX_VERSION_IS_LESS(5,5,0)
++#if LINUX_VERSION_IS_LESS(6,6,58)
+ static inline int backport_genlmsg_multicast_allns(const struct genl_family *family,
+ 						   struct sk_buff *skb, u32 portid,
+ 						   unsigned int group)
+@@ -186,6 +186,6 @@ static inline int backport_genlmsg_multicast_allns(const struct genl_family *fam
+ 	return ret;
+ }
+ #define genlmsg_multicast_allns LINUX_BACKPORT(genlmsg_multicast_allns)
+-#endif /* LINUX_VERSION_IS_LESS(5,5,0) */
++#endif /* LINUX_VERSION_IS_LESS(6,6,58) */
+ 
+ #endif /* __BACKPORT_NET_GENETLINK_H */
+-- 
+2.45.2
+
