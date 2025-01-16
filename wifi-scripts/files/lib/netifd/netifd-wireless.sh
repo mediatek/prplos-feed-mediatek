@@ -204,6 +204,43 @@ _wdev_wrapper \
 	wireless_process_kill_all \
 	wireless_set_retry \
 
+wireless_vif_parse_encryption_rsno() {
+	json_get_vars encryption_rsno encryption_rsno_2
+	set_default encryption_rsno none
+	set_default encryption_rsno_2 none
+
+	rsno_auth_type=none
+	rsno_auth_type_2=none
+	rsno_wpa_cipher="CCMP"
+	rsno_wpa_cipher_2="GCMP-256"
+
+	case "$encryption_rsno" in
+		*ccmp256) rsno_wpa_cipher="CCMP-256";;
+		*aes|*ccmp) rsno_wpa_cipher="CCMP";;
+		*gcmp256) rsno_wpa_cipher="GCMP-256";;
+		*gcmp) rsno_wpa_cipher="GCMP";;
+	esac
+
+	case "$encryption_rsno_2" in
+		*ccmp256) rsno_wpa_cipher_2="CCMP-256";;
+		*aes|*ccmp) rsno_wpa_cipher_2="CCMP";;
+		*gcmp256) rsno_wpa_cipher_2="GCMP-256";;
+		*gcmp) rsno_wpa_cipher_2="GCMP";;
+	esac
+
+	case "$encryption_rsno" in
+		psk3*|sae*)
+			rsno_auth_type=sae
+		;;
+	esac
+
+	case "$encryption_rsno_2" in
+		psk3*|sae*)
+			rsno_auth_type_2=sae
+		;;
+	esac
+}
+
 wireless_vif_parse_encryption() {
 	json_get_vars encryption
 	set_default encryption none
@@ -293,6 +330,12 @@ wireless_vif_parse_encryption() {
 	esac
 
 	case "$encryption" in
+		*nosha256*)
+			nosha256=1
+		;;
+	esac
+
+	case "$encryption" in
 		*osen*)
 			auth_osen=1
 		;;
@@ -378,6 +421,7 @@ _wdev_common_device_config() {
 
 _wdev_common_iface_config() {
 	config_add_string mode ssid encryption 'key:wpakey'
+	config_add_string encryption_rsno encryption_rsno_2
 	config_add_boolean bridge_isolate
 }
 

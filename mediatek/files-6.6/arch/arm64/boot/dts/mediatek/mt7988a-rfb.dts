@@ -9,11 +9,14 @@
 #include <dt-bindings/pinctrl/mt65xx.h>
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/regulator/richtek,rt5190a-regulator.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	model = "MediaTek MT7988A Reference Board";
 	compatible = "mediatek,mt7988a-rfb",
-		     "mediatek,mt7988a";
+		     "mediatek,mt7988a",
+		     "mediatek,mt7988";
 
 	chosen {
 		bootargs = "console=ttyS0,115200n1 loglevel=8  \
@@ -24,6 +27,26 @@
 
 	memory {
 		reg = <0 0x40000000 0 0x40000000>;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 13 GPIO_ACTIVE_LOW>;
+		};
+
+		wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&pio 14 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	trng{
+		compatible = "mediatek,mt7988-rng";
 	};
 };
 
@@ -160,6 +183,19 @@
 	};
 };
 
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins>;
+	status = "okay";
+};
+
+&i2c2 {
+	pinctrl-names = "default";
+	/* pin-shared with 10G phys reset gpio pin */
+	pinctrl-0 = <&i2c2_1_pins>;
+	status = "disabled";
+};
+
 &pcie0 {
 	status = "okay";
 };
@@ -177,11 +213,11 @@
 };
 
 &ssusb0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ssusb1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &tphy {
@@ -197,5 +233,9 @@
 };
 
 &xphy {
+	status = "okay";
+};
+
+&lvts {
 	status = "okay";
 };

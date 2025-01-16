@@ -179,7 +179,7 @@ wifi_config() {
 	sleep 1
 
 	[ -e /tmp/.config_pending ] && return
-	ucode /usr/share/hostap/wifi-detect.uc
+
 
 	if (dmesg | grep -q "WM_TM"); then
 		export MT76_ENV_WM_TM=1
@@ -202,7 +202,11 @@ wifi_config() {
 		export MT76_ENV_RANDOM_MAC_BYTES=${macaddr}
 	fi
 
+	[ -e /etc/config/wireless ] && return
+
 	[ ! -f /etc/config/wireless ] && touch /etc/config/wireless
+	sleep 1
+	ucode /usr/share/hostap/wifi-detect.uc
 	ucode /lib/wifi/mac80211.uc | uci -q batch
 
 	for driver in $DRIVERS; do (

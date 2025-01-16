@@ -1,8 +1,4 @@
 // SPDX-License-Identifier: (GPL-2.0 OR MIT)
-/*
- * Copyright (C) 2022 MediaTek Inc.
- * Author: Sam.Shih <sam.shih@mediatek.com>
- */
 
 /dts-v1/;
 #include "mt7988a-rfb.dts"
@@ -12,7 +8,7 @@
 
 / {
 	compatible = "arcadyan,mozart", "mediatek,mt7988a";
-	model = "Mediatek/Arcadyan Mozart";
+	model = "MediaTek / Arcadyan - Mozart";
 
 	aliases {
 		serial0 = &uart0;
@@ -46,7 +42,7 @@
 			function = LED_FUNCTION_STATUS;
 			gpios = <&pio 30 GPIO_ACTIVE_HIGH>;
 		};
-		
+
 		led_status_blue: wifi_blue {
 			color = <LED_COLOR_ID_BLUE>;
 			function = LED_FUNCTION_STATUS;
@@ -87,20 +83,20 @@
 };
 
 &usxgmiisys0 {
-	mediatek,pn_swap_rx;
+	mediatek,pnswap-rx;
 };
 
 &usxgmiisys1 {
-	mediatek,pn_swap_rx;
+	mediatek,pnswap-rx;
 };
 
 &mdio_bus {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	reset-gpios = <&pio 72 1>;
-	reset-delay-us = <40000>;
+	reset-gpios = <&pio 72 GPIO_ACTIVE_LOW>;
+	reset-assert-us = <100000>;
+	reset-deassert-us = <100000>;
 
-	/* external Realtek RTL8261N */
 	phy0: ethernet-phy@0 {
 		reg = <0>;
 		compatible = "ethernet-phy-ieee802.3-c45";
@@ -112,10 +108,17 @@
 	};
 };
 
+&gmac0 {
+	nvmem-cells = <&macaddr_factory_4 3>;
+	nvmem-cell-names = "mac-address";
+};
+
 &gmac1 {
 	phy-mode = "usxgmii";
 	phy-connection-type = "usxgmii";
 	phy = <&phy0>;
+	nvmem-cells = <&macaddr_factory_4 4>;
+	nvmem-cell-names = "mac-address";
 	status = "okay";
 };
 
@@ -123,7 +126,37 @@
 	phy-mode = "usxgmii";
 	phy-connection-type = "usxgmii";
 	phy = <&phy8>;
+	nvmem-cells = <&macaddr_factory_4 5>;
+	nvmem-cell-names = "mac-address";
 	status = "okay";
+};
+
+&switch {
+	/delete-node/ports;
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gsw_port0: port@0 {
+			reg = <0>;
+			label = "lan0";
+			phy-mode = "internal";
+			phy-handle = <&gsw_phy0>;
+		};
+
+		port@6 {
+			reg = <6>;
+			ethernet = <&gmac0>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <10000>;
+				full-duplex;
+				pause;
+			};
+		};
+	};
 };
 
 &i2c1 {
@@ -154,6 +187,9 @@
 };
 
 &spi1 {
+	pinctrl-names = "default";
+	/* pin shared with snfi */
+	pinctrl-0 = <&spic_pins>;
 	status = "disabled";
 };
 
@@ -191,35 +227,110 @@
 				emmc_rootfs: block-partition-production {
 					partname = "production";
 				};
+
+				block-partition-factory {
+					partname = "factory";
+
+					nvmem-layout {
+						compatible = "fixed-layout";
+						#address-cells = <1>;
+						#size-cells = <1>;
+
+						eeprom_factory_0: eeprom@0 {
+							reg = <0x0 0x1e00>;
+						};
+
+						macaddr_factory_4: macaddr@a {
+							compatible = "mac-base";
+							reg = <0x4 0x6>;
+							#nvmem-cell-cells = <1>;
+						};
+					};
+				};
 			};
 		};
 	};
 };
 
-&switch {
-	/delete-node/ports;
+&cpu_thermal {
+	/delete-node/cooling-maps;
+	/delete-node/trips;
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		gsw_port0: port@0 {
-			reg = <0>;
-			label = "lan0";
-			phy-mode = "internal";
-			phy-handle = <&gsw_phy0>;
+	trips {
+		cpu_trip_crit: crit {
+			temperature = <125000>;
+			hysteresis = <2000>;
+			type = "critical";
 		};
 
-		port@6 {
-			reg = <6>;
-			ethernet = <&gmac0>;
-			phy-mode = "internal";
+		cpu_trip_hot: hot {
+			temperature = <120000>;
+			hysteresis = <2000>;
+			type = "hot";
+		};
 
-			fixed-link {
-				speed = <10000>;
-				full-duplex;
-				pause;
-			};
+		cpu_trip_active_high: active-high {
+			temperature = <110000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+
+		cpu_trip_active_med: active-med {
+			temperature = <80000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+
+		cpu_trip_active_low: active-low {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+
+		cpu_trip_active_silent: active-silent {
+			temperature = <40000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+
+	cooling-maps {
+		cpu-active-high {
+			/* active: set fan to cooling level 3 */
+			cooling-device = <&fan 3 3>;
+			trip = <&cpu_trip_active_high>;
+		};
+
+		cpu-active-med {
+			/* active: set fan to cooling level 2 */
+			cooling-device = <&fan 2 2>;
+			trip = <&cpu_trip_active_med>;
+		};
+
+		cpu-active-low {
+			/* active: set fan to cooling level 1 */
+			cooling-device = <&fan 1 1>;
+			trip = <&cpu_trip_active_low>;
+		};
+
+		cpu-active-silent {
+			/* active: set fan to cooling level 0 */
+			cooling-device = <&fan 0 0>;
+			trip = <&cpu_trip_active_silent>;
+		};
+	};
+};
+
+&pcie0 {
+	status = "okay";
+
+	pcie@0,0 {
+		reg = <0x0000 0 0 0 0>;
+
+		mt7996@1,0 {
+			reg = <0x0000 0 0 0 0>;
+			nvmem-cells = <&eeprom_factory_0>;
+			nvmem-cell-names = "eeprom";
 		};
 	};
 };

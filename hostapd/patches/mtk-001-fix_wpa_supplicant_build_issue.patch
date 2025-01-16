@@ -1,0 +1,12 @@
+diff --git a/wpa_supplicant/Makefile b/wpa_supplicant/Makefile
+index d2982cb..23a3e44 100644
+--- a/wpa_supplicant/Makefile
++++ b/wpa_supplicant/Makefile
+@@ -1082,6 +1082,7 @@ endif
+ ifdef CONFIG_IEEE80211BE
+ CONFIG_IEEE80211AX=y
+ CFLAGS += -DCONFIG_IEEE80211BE
++OBJS += ../src/ap/scs.o
+ endif
+ ifdef CONFIG_IEEE80211AX
+ CFLAGS += -DCONFIG_IEEE80211AX

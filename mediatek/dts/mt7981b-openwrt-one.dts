@@ -8,11 +8,13 @@
 	compatible = "openwrt,one", "mediatek,mt7981";
 
 	aliases {
-		serial0 = &uart0;
+		ethernet0 = &gmac1;
+		label-mac-device = &gmac0;
 		led-boot = &led_status_white;
 		led-failsafe = &led_status_red;
 		led-running = &led_status_green;
 		led-upgrade = &led_status_green;
+		serial0 = &uart0;
 	};
 
 	chosen {
@@ -146,8 +148,6 @@
 		reg = <1>;
 		phy-mode = "gmii";
 		phy-handle = <&int_gbe_phy>;
-		nvmem-cell-names = "mac-address";
-		nvmem-cells = <&macaddr_factory_2a>;
 	};
 };
 
@@ -395,11 +395,6 @@
 						reg = <0x24 0x6>;
 						compatible = "mac-base";
 					};
-
-					macaddr_factory_2a: macaddr@2a {
-						reg = <0x2a 0x6>;
-						compatible = "mac-base";
-					};
 				};
 			};
 
@@ -455,7 +450,7 @@
 
 	band@1 {
 		reg = <1>;
-		nvmem-cells = <&macaddr_factory_4 1>;
+		nvmem-cells = <&macaddr_factory_4 7>;
 		nvmem-cell-names = "mac-address";
 	};
 };

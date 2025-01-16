@@ -73,19 +73,50 @@ function freq_to_channel(freq) {
 	return 0;
 }
 
+function freq_range_match(ranges, freq) {
+	freq *= 1000;
+	for (let range in ranges) {
+		if (freq >= range[0] && freq <= range[1])
+			return true;
+	}
+	return false;
+}
+
 function wiphy_detect() {
 	let phys = nl.request(nl.const.NL80211_CMD_GET_WIPHY, nl.const.NLM_F_DUMP, { split_wiphy_dump: true });
 	if (!phys)
 		return;
 
 	for (let phy in phys) {
+		if (!phy)
+			continue;
+
 		let name = phy.wiphy_name;
 		let path = phy_path(name);
 		let info = {
 			antenna_rx: phy.wiphy_antenna_avail_rx,
 			antenna_tx: phy.wiphy_antenna_avail_tx,
 			bands: {},
+			radios: []
 		};
+
+		for (let radio in phy.radios) {
+			// S1G is not supported yet
+			radio.freq_ranges = filter(radio.freq_ranges,
+				(range) => range.end > 2000000
+			);
+
+			if (!length(radio.freq_ranges))
+				continue;
+
+			push(info.radios, {
+				index: radio.index,
+				freq_ranges: map(radio.freq_ranges,
+					(range) => [ range.start, range.end ]
+				),
+				bands: {}
+			});
+		}
 
 		let bands = info.bands;
 		for (let band in phy.wiphy_bands) {
@@ -110,6 +141,7 @@ function wiphy_detect() {
 			if (band.vht_capa > 0)
 				band_info.vht = true;
 			let he_phy_cap = 0;
+			let eht_phy_cap = 0;
 
 			for (let ift in band.iftype_data) {
 				if (!ift.he_cap_phy)
@@ -117,8 +149,15 @@ function wiphy_detect() {
 
 				band_info.he = true;
 				he_phy_cap |= ift.he_cap_phy[0];
+
+				/* if (!ift.eht_cap_phy) */
+				/*	continue; */
+
+				/* TODO: EHT */
 				/* FIXME: hardcode */
 				band_info.eht = true;
+				eht_phy_cap = 2;
+				/* eht_phy_cap |= ift.eht_cap_phy[0]; */
 			}
 
 			if (band_name == "6G" && band_info.eht)
@@ -148,10 +187,29 @@ function wiphy_detect() {
 				if (band_info.vht)
 					push(modes, "VHT40")
 			}
-			if (he_phy_cap & 0x2) {
+			if (he_phy_cap & 2)
 				push(modes, "HE40");
-				if (band_info.eht)
-					push(modes, "EHT40");
+
+			if (eht_phy_cap && he_phy_cap & 2)
+				push(modes, "EHT40");
+
+			for (let radio in info.radios) {
+				let freq_match = filter(band.freqs,
+					(freq) => freq_range_match(radio.freq_ranges, freq.freq)
+				);
+				if (!length(freq_match))
+					continue;
+
+				let radio_band = {};
+				radio.bands[band_name] = radio_band;
+
+				freq_match = filter(freq_match,
+					(freq) => !freq.disabled
+				);
+
+				let freq = freq_match[0];
+				if (freq)
+					radio_band.default_channel = freq_to_channel(freq.freq);
 			}
 
 			for (let freq in band.freqs) {
@@ -166,21 +224,25 @@ function wiphy_detect() {
 
 			if (band_name == "2G")
 				continue;
+
+			if (he_phy_cap & 4)
+				push(modes, "HE40");
+			if (eht_phy_cap && he_phy_cap & 4)
+				push(modes, "EHT40");
 			if (band_info.vht)
 				push(modes, "VHT80");
-			if (he_phy_cap & 4) {
+			if (he_phy_cap & 4)
 				push(modes, "HE80");
-				if (band_info.eht)
-					push(modes, "EHT80");
-			}
+			if (eht_phy_cap && he_phy_cap & 4)
+				push(modes, "EHT80");
 			if ((band.vht_capa >> 2) & 0x3)
 				push(modes, "VHT160");
-			if (he_phy_cap & 0x18) {
+			if (he_phy_cap & 0x18)
 				push(modes, "HE160");
-				if (band_info.eht)
-					push(modes, "EHT160");
-			}
-			if (band_name == "6G" && band_info.eht)
+			if (eht_phy_cap && he_phy_cap & 0x18)
+				push(modes, "EHT160");
+
+			if (eht_phy_cap & 2)
 				push(modes, "EHT320");
 		}
 

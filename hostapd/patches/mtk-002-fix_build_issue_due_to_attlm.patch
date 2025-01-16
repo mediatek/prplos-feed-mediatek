@@ -1,0 +1,18 @@
+diff --git a/src/ap/drv_callbacks.c b/src/ap/drv_callbacks.c
+index 160f312..ba0942e 100644
+--- a/src/ap/drv_callbacks.c
++++ b/src/ap/drv_callbacks.c
+@@ -1489,11 +1489,13 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
+ 			return;
+ 	}
+ 
++#ifdef CONFIG_TESTING_OPTIONS
+ 	for_each_mld_link(p_hapd, hapd) {
+ 		if (mld->new_attlm.disabled_links & BIT(p_hapd->mld_link_id))
+ 			p_hapd->conf->mld_indicate_disabled =
+ 							mld_indicate_disabled;
+ 	}
++#endif /* CONFIG_TESTING_OPTIONS */
+ 
+ 	ieee802_11_set_beacon(hapd);
+ }
