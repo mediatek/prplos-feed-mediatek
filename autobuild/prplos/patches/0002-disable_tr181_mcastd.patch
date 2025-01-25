@@ -1,0 +1,23 @@
+diff --git a/profiles/prpl.yml b/profiles/prpl.yml
+index 693dcad615..2730859ccc 100644
+--- a/profiles/prpl.yml
++++ b/profiles/prpl.yml
+@@ -135,9 +135,6 @@ packages:
+   - lxc-user-nic
+   - lxc-usernsexec
+   - lxc-wait
+-  - mcastd-core
+-  - mcastd-noforward
+-  - mcastd-routing
+   - miniupnpd-prpl
+   - mod-amxb-ubus
+   - mod-amxb-usp
+@@ -213,7 +210,6 @@ packages:
+   - tr181-ipdiagnostics
+   - tr181-led
+   - tr181-logical
+-  - tr181-mcastd
+   - tr181-neighbordiscovery
+   - tr181-pcp
+   - tr181-ppp
+
