@@ -214,7 +214,7 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 
 
 ## Layout of feed_mediatek
-![feed_mediatek](https://git01.mediatek.com/plugins/gitiles/filogic/prolos/prplos-feed-mediatek/+/refs/heads/master/feed_mtk.PNG)
+![feed_mediatek](feed_mtk.png)
 
 ## How to update prplMesh/pwhm version in prplOS
 After the new version of the prplmesh/pwhm has been released, we need to update it in prplOS.
