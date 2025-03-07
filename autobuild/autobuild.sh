@@ -26,7 +26,6 @@ mtk_prplos_patch() {
     done
 }
 
-
 # Set prplos_root variable to the current directory
 prplos_root="$(pwd)"
 echo -e "\033[1;32m === Setting prplos_root to the current directory: ${prplos_root} === \033[0m"

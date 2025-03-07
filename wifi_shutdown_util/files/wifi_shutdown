@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc.common
+
+STOP=21
+USE_PROCD=1
+
+shutdown() {
+	/etc/init.d/prplmesh shutdown
+	/etc/init.d/prplmesh_whm shutdown
+}

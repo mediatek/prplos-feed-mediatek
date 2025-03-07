@@ -205,6 +205,7 @@ wifi_config() {
 	[ -e /etc/config/wireless ] && return
 
 	[ ! -f /etc/config/wireless ] && touch /etc/config/wireless
+	/sbin/wireless-filogic
 	sleep 1
 	ucode /usr/share/hostap/wifi-detect.uc
 	ucode /lib/wifi/mac80211.uc | uci -q batch

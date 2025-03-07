@@ -1,13 +1,13 @@
 diff --git a/include/kernel-6.6 b/include/kernel-6.6
 new file mode 100644
-index 0000000000..f034d0754c
+index 0000000..aa0a345
 --- /dev/null
 +++ b/include/kernel-6.6
 @@ -0,0 +1,2 @@
-+LINUX_VERSION-6.6 = .71
-+LINUX_KERNEL_HASH-6.6.71 = 219715ba2dcfa6539fba09ad3f9212772f3507189eb60d77f8e89b06c32e724e
++LINUX_VERSION-6.6 = .73
++LINUX_KERNEL_HASH-6.6.73 = d2028db190c201650898be8db1c705e9fe73ab44fc04290b4f7af63514122490
 diff --git a/include/target.mk b/include/target.mk
-index 6514c535f2..92caaae215 100644
+index 6514c53..92caaae 100644
 --- a/include/target.mk
 +++ b/include/target.mk
 @@ -143,11 +143,11 @@ ifneq ($(TARGET_BUILD)$(if $(DUMP),,1),)
@@ -28,7 +28,7 @@ index 6514c535f2..92caaae215 100644
  __config_name_list = $(1)/config-$(KERNEL_PATCHVER) $(1)/config-default
  __config_list = $(firstword $(wildcard $(call __config_name_list,$(1))))
 diff --git a/package/base-files/Makefile b/package/base-files/Makefile
-index ce659d8684..828edf03b8 100644
+index ce659d8..828edf0 100644
 --- a/package/base-files/Makefile
 +++ b/package/base-files/Makefile
 @@ -17,6 +17,7 @@ PKG_RELEASE:=$(COMMITCOUNT)
@@ -49,7 +49,7 @@ index ce659d8684..828edf03b8 100644
  
  ifneq ($(DUMP),1)
 diff --git a/package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c b/package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c
-index 522085bb2f..944ef7c5db 100644
+index 522085b..944ef7c 100644
 --- a/package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c
 +++ b/package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c
 @@ -538,9 +538,14 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
@@ -69,7 +69,7 @@ index 522085bb2f..944ef7c5db 100644
  		}
  
 diff --git a/package/network/config/netifd/Makefile b/package/network/config/netifd/Makefile
-index acfabf05e0..a2d6d3583e 100644
+index acfabf0..a2d6d35 100644
 --- a/package/network/config/netifd/Makefile
 +++ b/package/network/config/netifd/Makefile
 @@ -9,6 +9,7 @@ PKG_SOURCE_DATE:=2024-01-04
@@ -91,10 +91,10 @@ index acfabf05e0..a2d6d3583e 100644
  $(eval $(call BuildPackage,netifd))
 diff --git a/profiles/mtk_filogic.yml b/profiles/mtk_filogic.yml
 new file mode 100644
-index 0000000000..a0b1b0811e
+index 0000000..8872f64
 --- /dev/null
 +++ b/profiles/mtk_filogic.yml
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,56 @@
 +---
 +profiles:
 +  - mediatek_mt7988a-arcadyan-mozart
@@ -105,8 +105,8 @@ index 0000000000..a0b1b0811e
 +feeds:
 +  - name: feed_mediatek
 +    uri: https://gerrit.mediatek.inc/openwrt/feeds/prplos-feed-mediatek
-+    tracking_branch: mtk_dev
-+    revision: 704ce6b07add5eed6d9f519570cc63f6518dfe95
++    tracking_branch: prplos-3.2
++    revision: e52735e51c4b28d266c63005db3e98d6777f5164
 +
 +packages:
 +  - mediatek
@@ -136,6 +136,8 @@ index 0000000000..a0b1b0811e
 +  - tcpdump
 +  - mpstat
 +  - tftp
++  - wifi_shutdown_util
++  - netfilter-flowtable
 +
 +diffconfig: |
 +  CONFIG_TARGET_MULTI_PROFILE=y
@@ -150,7 +152,7 @@ index 0000000000..a0b1b0811e
 +  CONFIG_PACKAGE_CFG80211_TESTMODE=y
 +  # CONFIG_PACKAGE_wpad-basic-mbedtls is not set
 diff --git a/scripts/gen_config.py b/scripts/gen_config.py
-index 25338bcd55..e73a617e5f 100755
+index f2329a9..aabe4f1 100755
 --- a/scripts/gen_config.py
 +++ b/scripts/gen_config.py
 @@ -203,7 +203,7 @@ for ap in profile.get("additional_packages"):
@@ -162,4 +164,6 @@ index 25338bcd55..e73a617e5f 100755
          die(f"Error installing external target {profile['target']}")
  
  config_output = f"""CONFIG_TARGET_{profile["target"]}=y
+-- 
+2.45.2
 

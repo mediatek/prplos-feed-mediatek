@@ -998,6 +998,7 @@ define Device/mediatek_mt7988a-rfb
 	mt7988a-rfb-spim-nand-factory \
 	mt7988a-rfb-spim-nand-nmbm \
 	mt7988a-rfb-spim-nor \
+	mt7988a-rfb-eth0-gsw \
 	mt7988a-rfb-eth1-aqr \
 	mt7988a-rfb-eth1-cux3410 \
 	mt7988a-rfb-eth1-i2p5g-phy \
@@ -1598,6 +1599,10 @@ TARGET_DEVICES += zbtlink_zbt-z8103ax
 define Device/zyxel_ex5601-t0-stock
   DEVICE_VENDOR := Zyxel
   DEVICE_MODEL := EX5601-T0
+  DEVICE_ALT0_VENDOR := Zyxel
+  DEVICE_ALT0_MODEL := EX5601-T1
+  DEVICE_ALT1_VENDOR := Zyxel
+  DEVICE_ALT1_MODEL := T-56
   DEVICE_VARIANT := (stock layout)
   DEVICE_DTS := mt7986a-zyxel-ex5601-t0-stock
   DEVICE_DTS_DIR := ../dts
@@ -1621,6 +1626,10 @@ TARGET_DEVICES += zyxel_ex5601-t0-stock
 define Device/zyxel_ex5601-t0-ubootmod
   DEVICE_VENDOR := Zyxel
   DEVICE_MODEL := EX5601-T0
+  DEVICE_ALT0_VENDOR := Zyxel
+  DEVICE_ALT0_MODEL := EX5601-T1
+  DEVICE_ALT1_VENDOR := Zyxel
+  DEVICE_ALT1_MODEL := T-56
   DEVICE_VARIANT := (OpenWrt U-Boot layout)
   DEVICE_DTS := mt7986a-zyxel-ex5601-t0-ubootmod
   DEVICE_DTS_DIR := ../dts
