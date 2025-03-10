@@ -26,10 +26,33 @@ mtk_prplos_patch() {
     done
 }
 
+change_feed_mtk_revision() {
+    echo -e "\033[1;32m === Hack feed_mtk to latest revision... ===\033[0m"
+    REPO_URL="https://git01.mediatek.com/plugins/gitiles/filogic/prolos/prplos-feed-mediatek"
+    BRANCH="master"
+    YAML_FILE="profiles/mtk_filogic.yml"
+
+    # Get the latest commit hash from the specified branch
+    LATEST_COMMIT=$(git ls-remote $REPO_URL refs/heads/$BRANCH | awk '{print $1}')
+
+    # Check if the commit hash was successfully retrieved
+    if [ -z "$LATEST_COMMIT" ]; then
+        echo -e "\033[1;31m Failed to get the latest commit for branch $BRANCH \033[0m"
+        exit 1
+    fi
+
+    # Update the YAML file with the new revision
+    sed -i "s/revision: .*/revision: $LATEST_COMMIT/" ${prplos_root}/$YAML_FILE
+
+    echo "Updated $YAML_FILE with latest commit: $LATEST_COMMIT"
+}
+
 # Set prplos_root variable to the current directory
 prplos_root="$(pwd)"
 echo -e "\033[1;32m === Setting prplos_root to the current directory: ${prplos_root} === \033[0m"
 mtk_prplos_patch
+
+change_feed_mtk_revision
 
 # Construct the prplos_cmd command
 prplos_cmd="${prplos_root}/scripts/gen_config.py"

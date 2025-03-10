@@ -5,7 +5,8 @@ This prplOS feed is for MediaTek **Kernel6.6** targets platform.
 This repository can support [filogic880](https://www.mediatek.com/products/broadband-wifi/mediatek-filogic-880) series chipset, however you shall know the feature sets would be limited by the Prpl Feed Package readiness. (Ex: Wi-Fi7 MLO and Secure Boot..) 
 
 ## Getting Started with feed-mediatek
-Based on 2025.01 PrplOS repository status, the latest branch of mainline is mainline-23.05. So we take this branch as an example. Please be noted our final goal is PrplOS4.x which is based on OpenWrt24.10/Kernel 6.6 one.
+Based on 2025.01 PrplOS repository status, the latest branch of mainline is mainline-23.05. So we take this branch as an example.
+Please be noted this prpl mediatek feed shall fit with PrplWare3.2/4.0/4.1 versions.
 
 ### Image build steps
 
@@ -152,9 +153,9 @@ index 0000000..8872f64
 +description: Build image for MediaTek / Arcadyan Mozart board
 +feeds:
 +  - name: feed_mediatek
-+    uri: https://gerrit.mediatek.inc/openwrt/feeds/prplos-feed-mediatek
-+    tracking_branch: prplos-3.2
-+    revision: e52735e51c4b28d266c63005db3e98d6777f5164
++    uri: https://git01.mediatek.com/plugins/gitiles/filogic/prolos/prplos-feed-mediatek
++    tracking_branch: master
++    revision: b90e9ccad14204978f55a856864fd915bbd0b67f
 +
 +packages:
 +  - mediatek
