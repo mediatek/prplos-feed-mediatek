@@ -28,7 +28,7 @@ mtk_prplos_patch() {
 
 change_feed_mtk_revision() {
     echo -e "\033[1;32m === Hack feed_mtk to latest revision... ===\033[0m"
-    REPO_URL="https://git01.mediatek.com/plugins/gitiles/filogic/prolos/prplos-feed-mediatek"
+    REPO_URL="https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek"
     BRANCH="master"
     YAML_FILE="profiles/mtk_filogic.yml"
 
