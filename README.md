@@ -19,16 +19,19 @@ cd prplos
 ```
 
 #### 2. prplOS MTK Changes (Extra Patches)
-Additional patches need to be applied to support Kernel 6.6
-0001-prplos3.2_support_mozart_kernel6.6.patch
- - Apply Necessary prplos patch to support kernel 6.6
- - Forcibly use kernel target in feed_mediatek
- - Fix package dependency issue (WiFi Scripts)
- - Add mtk_filogic profile
-0002-disable_tr181_mcastd.patch
- - The tr181 prpl feed package would lead to a kernel crash on kernel6.6
-0004-add-netfilter-netlink-ftnl-package.patch
- - For manually inserting/deleting flow rule entries.
+Additional patches need to be applied to support Kernel 6.6:
+
+**0001-prplos3.2_support_mozart_kernel6.6.patch**
+- Apply the necessary prplos patch to support Kernel 6.6.
+- Forcibly use the kernel target in feed_mediatek.
+- Fix package dependency issues (WiFi scripts).
+- Add the mtk_filogic profile.
+
+**0002-disable_tr181_mcastd.patch**
+- The tr181 prpl feed package would lead to a kernel crash on Kernel 6.6.
+
+**0004-add-netfilter-netlink-ftnl-package.patch**
+- For manually deleting flow rule entries.
 
 ```
 git clone https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
@@ -47,11 +50,17 @@ Verify the Update
 To confirm that the revision has been successfully updated, run the following command:
 
 ```bash
-cat profiles/mtk_filogic.yml | grep revision
+cat profiles/mtk_filogic.yml | grep -B 4 "revision"
 ```
 
 You should see an output similar to the following, indicating the new revision:
-revision: bbccc96c559fc9630349dfb4392a95dbb469fd76
+```bash
+feeds:
+  - name: feed_mediatek
+    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
+    tracking_branch: master
+    revision: 60627bf7903f82dff7c0ae88d705a1166da22bde
+```
 
 #### 4. Configure prplOS with common prplMesh
 ```bash
@@ -73,6 +82,12 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 
 ## Layout of feed_mediatek
 ![feed_mediatek](feed_mtk.png)
+
+## Feed-Mediatek Prpl Release History
+
+| Date       | OpenWrt Source                                                                                                                                                     |
+|------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 2025.03.27 | Sync from [OpenWrt WiFi7 Beta Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/#filogic-880-wifi7-beta-release-2025_03_07) |
 
 ## pWHM Version status
 | pWHM version | Status |

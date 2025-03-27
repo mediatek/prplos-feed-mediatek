@@ -104,9 +104,9 @@ index 0000000..2c296eb
 +description: Build image for MediaTek / Arcadyan Mozart board
 +feeds:
 +  - name: feed_mediatek
-+    uri: https://gerrit.mediatek.inc/openwrt/feeds/prplos-feed-mediatek
-+    tracking_branch: prplos-3.2
-+    revision: c48cedcccc54ca392700c5ad6d2be4c4701ecc2a
++    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
++    tracking_branch: master
++    revision: # <need to replace with commit hash>
 +
 +packages:
 +  - mediatek
