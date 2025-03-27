@@ -30,15 +30,22 @@
 #include "mtk_eth_dbg.h"
 #include "mtk_wed_regs.h"
 
-u32 hw_lro_agg_num_cnt[MTK_MAX_RX_RING_NUM - 1][MTK_HW_LRO_MAX_AGG_CNT + 1];
-u32 hw_lro_agg_size_cnt[MTK_MAX_RX_RING_NUM - 1][16];
-u32 hw_lro_tot_agg_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_tot_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_agg_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_age_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_seq_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_timestamp_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
-u32 hw_lro_norule_flush_cnt[MTK_MAX_RX_RING_NUM - 1];
+enum mt753x_presence {
+	MT753X_ABSENT = 0,
+	MT753X_PRESENT = 1,
+	MT753X_UNKNOWN = 0xffff,
+};
+
+enum mt753x_presence mt753x_presence = MT753X_UNKNOWN;
+u32 hw_lro_agg_num_cnt[MTK_MAX_RX_RING_NUM][MTK_HW_LRO_MAX_AGG_CNT + 1];
+u32 hw_lro_agg_size_cnt[MTK_MAX_RX_RING_NUM][16];
+u32 hw_lro_tot_agg_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_tot_flush_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_agg_flush_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_age_flush_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_seq_flush_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_timestamp_flush_cnt[MTK_MAX_RX_RING_NUM];
+u32 hw_lro_norule_flush_cnt[MTK_MAX_RX_RING_NUM];
 u32 mtk_hwlro_stats_ebl;
 u32 dbg_show_level;
 
@@ -356,7 +363,7 @@ int mt798x_iomap(void)
 {
 	struct device_node *np = NULL;
 
-	np = of_find_node_by_name(NULL, "switch0");
+	np = of_find_compatible_node(NULL, NULL, "mediatek,mt7988-switch");
 	if (np) {
 		eth_debug.base = of_iomap(np, 0);
 		if (!eth_debug.base) {
@@ -415,6 +422,35 @@ u32 mt7530_mdio_r32(struct mtk_eth *eth, u32 reg)
 	mutex_unlock(&eth->mii_bus->mdio_lock);
 
 	return (high << 16) | (low & 0xffff);
+}
+
+static enum mt753x_presence mt753x_sw_detect(struct mtk_eth *eth)
+{
+	struct device_node *np;
+	u32 sw_id;
+	u32 rev;
+
+	/* mt7988 with built-in 7531 */
+	np = of_find_compatible_node(NULL, NULL, "mediatek,mt7988-switch");
+	if (np) {
+		of_node_put(np);
+		return MT753X_PRESENT;
+	}
+	/* external 753x */
+	rev = mt7530_mdio_r32(eth, 0x781c);
+	sw_id = (rev & 0xffff0000) >> 16;
+	if (sw_id == 0x7530 || sw_id == 0x7531)
+		return MT753X_PRESENT;
+
+	return MT753X_ABSENT;
+}
+
+static enum mt753x_presence mt7530_exist(struct mtk_eth *eth)
+{
+	if (mt753x_presence == MT753X_UNKNOWN)
+		mt753x_presence = mt753x_sw_detect(eth);
+
+	return mt753x_presence;
 }
 
 void mtk_switch_w32(struct mtk_eth *eth, u32 val, unsigned int reg)
@@ -534,6 +570,7 @@ static int mtketh_mt7530sw_debug_show(struct seq_file *m, void *private)
 		return 0;
 	}
 
+	mt798x_iomap();
 	for (i = 0 ; i < ARRAY_SIZE(ranges) ; i++) {
 		for (offset = ranges[i].start;
 		     offset <= ranges[i].end; offset += 4) {
@@ -542,6 +579,7 @@ static int mtketh_mt7530sw_debug_show(struct seq_file *m, void *private)
 				   offset, data);
 		}
 	}
+	mt798x_iounmap();
 
 	return 0;
 }
@@ -600,11 +638,13 @@ static ssize_t mtketh_mt7530sw_debugfs_write(struct file *file,
 	if (kstrtoul(token, 16, (unsigned long *)&value))
 		return -EINVAL;
 
+	mt798x_iomap();
 	pr_info("%s:phy=%d, reg=0x%lx, val=0x%lx\n", __func__,
 		0x1f, reg, value);
 	mt7530_mdio_w32(eth, reg, value);
 	pr_info("%s:phy=%d, reg=0x%lx, val=0x%x confirm..\n", __func__,
 		0x1f, reg, mt7530_mdio_r32(eth, reg));
+	mt798x_iounmap();
 
 	return len;
 }
@@ -1432,7 +1472,7 @@ void hw_lro_stats_update(u32 ring_no, struct mtk_rx_dma_v2 *rxd)
 	struct mtk_eth *eth = g_eth;
 	u32 idx, agg_cnt, agg_size;
 
-	if (mtk_is_netsys_v2_or_greater(eth)) {
+	if (mtk_is_netsys_v3_or_greater(eth)) {
 		idx = ring_no - 4;
 		agg_cnt = FIELD_GET(RX_DMA_GET_AGG_CNT_V2, rxd->rxd6);
 	} else {
@@ -1440,7 +1480,7 @@ void hw_lro_stats_update(u32 ring_no, struct mtk_rx_dma_v2 *rxd)
 		agg_cnt = FIELD_GET(RX_DMA_GET_AGG_CNT, rxd->rxd2);
 	}
 
-	if (idx >= MTK_MAX_RX_RING_NUM - 1)
+	if (idx >= MTK_HW_LRO_RING_NUM)
 		return;
 
 	agg_size = RX_DMA_GET_PLEN0(rxd->rxd2);
@@ -1456,7 +1496,7 @@ void hw_lro_flush_stats_update(u32 ring_no, struct mtk_rx_dma_v2 *rxd)
 	struct mtk_eth *eth = g_eth;
 	u32 idx, flush_reason;
 
-	if (mtk_is_netsys_v2_or_greater(eth)) {
+	if (mtk_is_netsys_v3_or_greater(eth)) {
 		idx = ring_no - 4;
 		flush_reason = FIELD_GET(RX_DMA_GET_FLUSH_RSN_V2, rxd->rxd6);
 	} else {
@@ -1464,7 +1504,7 @@ void hw_lro_flush_stats_update(u32 ring_no, struct mtk_rx_dma_v2 *rxd)
 		flush_reason = FIELD_GET(RX_DMA_GET_REV, rxd->rxd2);
 	}
 
-	if (idx >= MTK_MAX_RX_RING_NUM - 1)
+	if (idx >= MTK_HW_LRO_RING_NUM)
 		return;
 
 	if ((flush_reason & 0x7) == MTK_HW_LRO_AGG_FLUSH)
@@ -1733,7 +1773,7 @@ int hwlro_agg_cnt_ctrl(int cnt)
 	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	int i;
 
-	for (i = 1; i < MTK_MAX_RX_RING_NUM; i++)
+	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++)
 		SET_PDMA_RXRING_MAX_AGG_CNT(eth, i, cnt);
 
 	return 0;
@@ -1745,7 +1785,7 @@ int hwlro_agg_time_ctrl(int time)
 	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	int i;
 
-	for (i = 1; i < MTK_MAX_RX_RING_NUM; i++)
+	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++)
 		SET_PDMA_RXRING_AGG_TIME(eth, i, time);
 
 	return 0;
@@ -1757,7 +1797,7 @@ int hwlro_age_time_ctrl(int time)
 	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	int i;
 
-	for (i = 1; i < MTK_MAX_RX_RING_NUM; i++)
+	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++)
 		SET_PDMA_RXRING_AGE_TIME(eth, i, time);
 	return 0;
 }
@@ -1765,6 +1805,7 @@ int hwlro_age_time_ctrl(int time)
 int hwlro_threshold_ctrl(int bandwidth)
 {
 	struct mtk_eth *eth = g_eth;
+	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 
 	SET_PDMA_LRO_BW_THRESHOLD(eth, bandwidth);
 
@@ -1779,7 +1820,7 @@ int hwlro_ring_enable_ctrl(int enable)
 
 	pr_info("[%s] %s HW LRO rings\n", __func__, (enable) ? "Enable" : "Disable");
 
-	for (i = 1; i < MTK_MAX_RX_RING_NUM; i++)
+	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++)
 		SET_PDMA_RXRING_VALID(eth, i, enable);
 
 	return 0;
@@ -1843,6 +1884,7 @@ ssize_t hw_lro_auto_tlb_write(struct file *file, const char __user *buffer,
 void hw_lro_auto_tlb_dump_v1(struct seq_file *seq, u32 index)
 {
 	struct mtk_eth *eth = g_eth;
+	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	struct mtk_lro_alt_v1 alt;
 	__be32 addr;
 	u32 tlb_info[9];
@@ -1902,6 +1944,7 @@ void hw_lro_auto_tlb_dump_v1(struct seq_file *seq, u32 index)
 void hw_lro_auto_tlb_dump_v2(struct seq_file *seq, u32 index)
 {
 	struct mtk_eth *eth = g_eth;
+	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	struct mtk_lro_alt_v2 alt;
 	u32 score = 0, ipv4 = 0;
 	u32 ipv6[4] = { 0 };
@@ -1909,10 +1952,10 @@ void hw_lro_auto_tlb_dump_v2(struct seq_file *seq, u32 index)
 	int i;
 
 	/* read valid entries of the auto-learn table */
-	mtk_w32(eth, index << MTK_LRO_ALT_INDEX_OFFSET, MTK_LRO_ALT_DBG);
+	mtk_w32(eth, index << MTK_LRO_ALT_INDEX_OFFSET, reg_map->pdma.lro_alt_dbg);
 
 	for (i = 0; i < 11; i++)
-		tlb_info[i] = mtk_r32(eth, MTK_LRO_ALT_DBG_DATA);
+		tlb_info[i] = mtk_r32(eth, reg_map->pdma.lro_alt_dbg_data);
 
 	memcpy(&alt, tlb_info, sizeof(struct mtk_lro_alt_v2));
 
@@ -1989,7 +2032,7 @@ int hw_lro_auto_tlb_read(struct seq_file *seq, void *v)
 	seq_puts(seq, "[4] = hwlro_ring_enable_ctrl\n");
 	seq_puts(seq, "[5] = hwlro_stats_enable_ctrl\n\n");
 
-	if (mtk_is_netsys_v2_or_greater(eth)) {
+	if (mtk_is_netsys_v3_or_greater(eth)) {
 		for (i = 1; i <= 8; i++)
 			hw_lro_auto_tlb_dump_v2(seq, i);
 	} else {
@@ -2010,7 +2053,7 @@ int hw_lro_auto_tlb_read(struct seq_file *seq, void *v)
 	/* Read the agg_time/age_time/agg_cnt of LRO rings */
 	seq_puts(seq, "\nHW LRO Ring Settings\n");
 
-	for (i = 1; i < MTK_MAX_RX_RING_NUM; i++) {
+	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++) {
 		reg_op1 = mtk_r32(eth, MTK_LRO_CTRL_DW1_CFG(i));
 		reg_op2 = mtk_r32(eth, MTK_LRO_CTRL_DW2_CFG(i));
 		reg_op3 = mtk_r32(eth, MTK_LRO_CTRL_DW3_CFG(i));

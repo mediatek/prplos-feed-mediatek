@@ -180,13 +180,8 @@ wifi_config() {
 
 	[ -e /tmp/.config_pending ] && return
 
-
 	if (dmesg | grep -q "WM_TM"); then
 		export MT76_ENV_WM_TM=1
-	fi
-
-	if (lspci | grep -q "7992"); then
-		export MT76_ENV_TX_BURST_ZERO=1
 	fi
 
 	if (dmesg | grep -q "eeprom load fail"); then

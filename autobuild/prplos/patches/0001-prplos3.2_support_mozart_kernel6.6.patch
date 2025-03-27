@@ -1,11 +1,11 @@
 diff --git a/include/kernel-6.6 b/include/kernel-6.6
 new file mode 100644
-index 0000000..aa0a345
+index 0000000..2e70a47
 --- /dev/null
 +++ b/include/kernel-6.6
 @@ -0,0 +1,2 @@
-+LINUX_VERSION-6.6 = .73
-+LINUX_KERNEL_HASH-6.6.73 = d2028db190c201650898be8db1c705e9fe73ab44fc04290b4f7af63514122490
++LINUX_VERSION-6.6 = .79
++LINUX_KERNEL_HASH-6.6.79 = 07a6f904470da1a099aa1683e3025a999dd82f2438f78b006b80c6ae2e9dfe8d
 diff --git a/include/target.mk b/include/target.mk
 index 6514c53..92caaae 100644
 --- a/include/target.mk
@@ -91,10 +91,10 @@ index acfabf0..a2d6d35 100644
  $(eval $(call BuildPackage,netifd))
 diff --git a/profiles/mtk_filogic.yml b/profiles/mtk_filogic.yml
 new file mode 100644
-index 0000000..8872f64
+index 0000000..2c296eb
 --- /dev/null
 +++ b/profiles/mtk_filogic.yml
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,51 @@
 +---
 +profiles:
 +  - mediatek_mt7988a-arcadyan-mozart
@@ -104,9 +104,9 @@ index 0000000..8872f64
 +description: Build image for MediaTek / Arcadyan Mozart board
 +feeds:
 +  - name: feed_mediatek
-+    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
-+    tracking_branch: master
-+    revision: # <need to replace with commit hash>
++    uri: https://gerrit.mediatek.inc/openwrt/feeds/prplos-feed-mediatek
++    tracking_branch: prplos-3.2
++    revision: c48cedcccc54ca392700c5ad6d2be4c4701ecc2a
 +
 +packages:
 +  - mediatek
@@ -128,7 +128,6 @@ index 0000000..8872f64
 +  - mtkhnat_util
 +  - mt7988-2p5g-phy-firmware
 +  - mt7988-wo-firmware
-+  - u-boot-mt7988_arcadyan_mozart
 +  - aqr10g-phy-firmware
 +  - smp_util
 +  - regs
@@ -144,15 +143,11 @@ index 0000000..8872f64
 +  CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988a-rfb=y
 +  CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988d-rfb=y
 +  CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_arcadyan_mozart=y
-+  # CONFIG_PACKAGE_trusted-firmware-a-mt7981-ram-ddr3 is not set
-+  # CONFIG_PACKAGE_trusted-firmware-a-mt7981-ram-ddr4 is not set
-+  # CONFIG_PACKAGE_trusted-firmware-a-mt7986-ram-ddr3 is not set
-+  # CONFIG_PACKAGE_trusted-firmware-a-mt7986-ram-ddr4 is not set
-+  # CONFIG_PACKAGE_trusted-firmware-a-mt7988-ram-comb is not set
 +  CONFIG_PACKAGE_CFG80211_TESTMODE=y
++  CONFIG_WPA_MSG_MIN_PRIORITY=0
 +  # CONFIG_PACKAGE_wpad-basic-mbedtls is not set
 diff --git a/scripts/gen_config.py b/scripts/gen_config.py
-index f2329a9..aabe4f1 100755
+index 1554189..1f6fcaa 100755
 --- a/scripts/gen_config.py
 +++ b/scripts/gen_config.py
 @@ -203,7 +203,7 @@ for ap in profile.get("additional_packages"):

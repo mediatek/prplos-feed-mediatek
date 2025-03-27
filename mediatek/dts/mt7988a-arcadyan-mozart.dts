@@ -9,6 +9,7 @@
 / {
 	compatible = "arcadyan,mozart", "mediatek,mt7988a";
 	model = "MediaTek / Arcadyan - Mozart";
+	mediatek,no-split-fitrw;
 
 	aliases {
 		serial0 = &uart0;
@@ -19,7 +20,7 @@
 	};
 
 	chosen {
-		rootdisk = <&emmc_rootfs>;
+		rootdisk-emmc = <&emmc_rootfs>;
 	};
 
 	gpio-leds {
@@ -28,25 +29,25 @@
 		wifi_white {
 			color = <LED_COLOR_ID_WHITE>;
 			function = LED_FUNCTION_STATUS;
-			gpios = <&pio 68 GPIO_ACTIVE_HIGH>;
+			gpios = <&pio 65 GPIO_ACTIVE_HIGH>;
 		};
 
 		led_status_red: wifi_red {
 			color = <LED_COLOR_ID_RED>;
 			function = LED_FUNCTION_STATUS;
-			gpios = <&pio 29 GPIO_ACTIVE_HIGH>;
+			gpios = <&pio 66 GPIO_ACTIVE_HIGH>;
 		};
 
 		led_status_green: wifi_green {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_STATUS;
-			gpios = <&pio 30 GPIO_ACTIVE_HIGH>;
+			gpios = <&pio 26 GPIO_ACTIVE_HIGH>;
 		};
 
 		led_status_blue: wifi_blue {
 			color = <LED_COLOR_ID_BLUE>;
 			function = LED_FUNCTION_STATUS;
-			gpios = <&pio 31 GPIO_ACTIVE_HIGH>;
+			gpios = <&pio 27 GPIO_ACTIVE_HIGH>;
 		};
 	};
 
@@ -57,6 +58,12 @@
 			label = "reset";
 			linux,code = <KEY_RESTART>;
 			gpios = <&pio 13 GPIO_ACTIVE_LOW>;
+		};
+
+		button-wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&pio 14 GPIO_ACTIVE_LOW>;
 		};
 	};
 };
@@ -93,7 +100,7 @@
 &mdio_bus {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	reset-gpios = <&pio 72 GPIO_ACTIVE_LOW>;
+	reset-gpios = <&pio 68 GPIO_ACTIVE_LOW>;
 	reset-assert-us = <100000>;
 	reset-deassert-us = <100000>;
 
@@ -225,7 +232,7 @@
 				};
 
 				emmc_rootfs: block-partition-production {
-					partname = "production";
+					partname = "firmware";
 				};
 
 				block-partition-factory {
@@ -334,3 +341,34 @@
 		};
 	};
 };
+
+&gsw_phy1 {
+	/delete-property/ pinctrl-0;
+	pinctrl-names = "gbe-led";
+};
+
+&gsw_phy1_led0 {
+	status = "disabled";
+	color = <LED_COLOR_ID_GREEN>;
+};
+
+&gsw_phy2 {
+	/delete-property/ pinctrl-0;
+	pinctrl-names = "gbe-led";
+};
+
+&gsw_phy2_led0 {
+	status = "disabled";
+	color = <LED_COLOR_ID_GREEN>;
+};
+
+&gsw_phy3 {
+	/delete-property/ pinctrl-0;
+	pinctrl-names = "gbe-led";
+};
+
+&gsw_phy3_led0 {
+	status = "disabled";
+	color = <LED_COLOR_ID_GREEN>;
+};
+

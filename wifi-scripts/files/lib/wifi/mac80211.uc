@@ -12,7 +12,6 @@ if (!board.wlan)
 let idx = 0;
 let commit;
 
-let has_mlo = 1;
 let random_mac_bytes = getenv("MT76_ENV_RANDOM_MAC_BYTES");
 let config = uci.cursor().get_all("wireless") ?? {};
 
@@ -119,21 +118,19 @@ for (let phy_name, phy in board.wlan) {
 		let background_radar = 0;
 		let encryption = "none";
 		let mbo = 0;
-		let band_idx = 0;
 		let ssid = "";
 		let ssid_bh = "";
 
 		if (band_name == "6g") {
 			encryption = "sae";
 			mbo = 1;
-			band_idx = 2;
 			ssid = "prplOS-6g";
 			ssid_bh = "prplOSbh-6g";
+			mbssid = 1;
 		} else if (band_name == "5g") {
 			noscan = 1;
 			rnr = 1;
 			background_radar = 1;
-			band_idx = 1;
 			ssid = "prplOS-5g";
 			ssid_bh = "prplOSbh-5g";
 		} else {
@@ -153,8 +150,8 @@ set ${s}.country='${country || 'US'}'
 set ${s}.num_global_macaddr='${num_global_macaddr || ''}'
 set ${s}.disabled='${defaults ? 0 : disabled}'
 set ${s}.noscan=${noscan}
-set ${s}.band_idx=${band_idx}
 `);
+
 		print(`set ${si}=wifi-iface
 set ${si}.device='${name}'
 set ${si}.network='lan'
@@ -181,27 +178,21 @@ set ${si}.mbo=${mbo}
 set ${si}.sae_pwe=2
 set ${si}.ieee80211w=2
 `);
-		if (random_mac_bytes) {
+		if (random_mac_bytes)
 			print(`set ${si}.macaddr=00:0${idx}:55:66${random_mac_bytes}
 `);
-			if (has_mlo)
-				print(`set ${si_mld}.macaddr=00:1${idx}:55:66${random_mac_bytes}
-`);
-		}
 
 		let si_bh = si + "_bh";
-
-			print(`set ${si_bh}=wifi-iface
+		print(`set ${si_bh}=wifi-iface
 set ${si_bh}.device='${name}'
 set ${si_bh}.network='lan'
 set ${si_bh}.mode='ap'
 set ${si_bh}.ssid=${ssid_bh}
-
 `);
+
 		config[name] = {};
 		commit = true;
 	}
-
 
 	commit = true;
 }
