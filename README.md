@@ -36,8 +36,7 @@ for patch in prplos-feed-mediatek/autobuild/prplos/patches/*.patch; do patch -p1
 ```
 
 #### 3. Update the mtk_filogic.yml File
-To ensure that the configuration file uses the latest revision, execute the following command:
-
+Select the fixed revision or just to follow the latest revision, execute the following command:
 ```
 sed -i "s/revision: .*/revision: $(git ls-remote https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek refs/heads/master | awk '{print $1}')/" ./profiles/mtk_filogic.yml
 ```
