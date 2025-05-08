@@ -9,7 +9,6 @@
 / {
 	compatible = "arcadyan,mozart", "mediatek,mt7988a";
 	model = "MediaTek / Arcadyan - Mozart";
-	mediatek,no-split-fitrw;
 
 	aliases {
 		serial0 = &uart0;

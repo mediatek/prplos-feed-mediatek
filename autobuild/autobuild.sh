@@ -77,4 +77,4 @@ fi
 
 # Execute the make command using 32 threads
 echo -e "\033[1;32m === Executing make command... ===\033[0m"
-make -j32
+make -j32 V=s

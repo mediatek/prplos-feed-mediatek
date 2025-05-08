@@ -1,5 +1,5 @@
 REQUIRE_IMAGE_METADATA=1
-RAMFS_COPY_BIN='fitblk blkid'
+RAMFS_COPY_BIN='fitblk blkid dmsetup'
 
 asus_initial_setup()
 {
@@ -68,6 +68,7 @@ platform_do_upgrade() {
 	case "$board" in
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb)
+		[ -e /dev/dm-0 ] && dmsetup remove_all
 		[ -e /dev/fit0 ] && fitblk /dev/fit0
 		[ -e /dev/fitrw ] && fitblk /dev/fitrw
 		export_fitblk_bootdev
@@ -94,6 +95,7 @@ platform_do_upgrade() {
 	bananapi,bpi-r3-mini|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-poe|\
+	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
@@ -102,6 +104,7 @@ platform_do_upgrade() {
 	mediatek,mt7981-rfb|\
 	mediatek,mt7988a-rfb|\
 	mercusys,mr90x-v1-ubi|\
+	netis,nx31|\
 	nokia,ea0326gmp|\
 	openwrt,one|\
 	netcore,n60|\
@@ -125,6 +128,7 @@ platform_do_upgrade() {
 	glinet,gl-mt6000|\
 	glinet,gl-x3000|\
 	glinet,gl-xe3000|\
+	huasifei,wh3000|\
 	smartrg,sdg-8612|\
 	smartrg,sdg-8614|\
 	smartrg,sdg-8622|\
@@ -245,6 +249,7 @@ platform_copy_config() {
 	glinet,gl-mt6000|\
 	glinet,gl-x3000|\
 	glinet,gl-xe3000|\
+	huasifei,wh3000|\
 	jdcloud,re-cp-03|\
 	smartrg,sdg-8612|\
 	smartrg,sdg-8614|\

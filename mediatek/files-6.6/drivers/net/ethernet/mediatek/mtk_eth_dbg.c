@@ -219,12 +219,21 @@ static ssize_t qdma_queue_show(struct file *file, char __user *user_buf,
 		scheduler = FIELD_GET(MTK_QTX_SCH_TX_SEL, qtx_sch);
 
 	min_rate_en = FIELD_GET(MTK_QTX_SCH_MIN_RATE_EN, qtx_sch);
-	min_rate = FIELD_GET(MTK_QTX_SCH_MIN_RATE_MAN, qtx_sch);
-	min_rate_exp = FIELD_GET(MTK_QTX_SCH_MIN_RATE_EXP, qtx_sch);
-	max_rate_en = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EN, qtx_sch);
-	max_weight = FIELD_GET(MTK_QTX_SCH_MAX_RATE_WEIGHT, qtx_sch);
-	max_rate = FIELD_GET(MTK_QTX_SCH_MAX_RATE_MAN, qtx_sch);
-	max_rate_exp = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EXP, qtx_sch);
+	if (mtk_is_netsys_v3_or_greater(eth) && (eth->soc->caps != MT7988_CAPS)) {
+		min_rate = FIELD_GET(MTK_QTX_SCH_MIN_RATE_MAN_V3, qtx_sch);
+		min_rate_exp = FIELD_GET(MTK_QTX_SCH_MIN_RATE_EXP_V3, qtx_sch);
+		max_rate_en = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EN_V3, qtx_sch);
+		max_weight = FIELD_GET(MTK_QTX_SCH_MAX_RATE_WEIGHT_V3, qtx_sch);
+		max_rate = FIELD_GET(MTK_QTX_SCH_MAX_RATE_MAN_V3, qtx_sch);
+		max_rate_exp = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EXP_V3, qtx_sch);
+	} else {
+		min_rate = FIELD_GET(MTK_QTX_SCH_MIN_RATE_MAN, qtx_sch);
+		min_rate_exp = FIELD_GET(MTK_QTX_SCH_MIN_RATE_EXP, qtx_sch);
+		max_rate_en = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EN, qtx_sch);
+		max_weight = FIELD_GET(MTK_QTX_SCH_MAX_RATE_WEIGHT, qtx_sch);
+		max_rate = FIELD_GET(MTK_QTX_SCH_MAX_RATE_MAN, qtx_sch);
+		max_rate_exp = FIELD_GET(MTK_QTX_SCH_MAX_RATE_EXP, qtx_sch);
+	}
 
 	while (min_rate_exp--)
 		min_rate *= 10;
@@ -301,7 +310,7 @@ static ssize_t qdma_queue_write(struct file *file, const char __user *buf,
 
 	line[length] = '\0';
 
-	if (mtk_is_netsys_v2_or_greater(eth)) {
+	if (mtk_is_netsys_v3_or_greater(eth)) {
 		if (max_rate > 10000000 || max_rate < 0 ||
 		    min_rate > 10000000 || min_rate < 0)
 			return -EINVAL;
@@ -328,13 +337,23 @@ static ssize_t qdma_queue_write(struct file *file, const char __user *buf,
 
 	if (min_enable)
 		qtx_sch |= MTK_QTX_SCH_MIN_RATE_EN;
-	qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_MAN, min_rate);
-	qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_EXP, min_exp);
-	if (max_enable)
-		qtx_sch |= MTK_QTX_SCH_MAX_RATE_EN;
-	qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_WEIGHT, weight);
-	qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_MAN, max_rate);
-	qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_EXP, max_exp);
+	if (mtk_is_netsys_v3_or_greater(eth) && (eth->soc->caps != MT7988_CAPS)) {
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_MAN_V3, min_rate);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_EXP_V3, min_exp);
+		if (max_enable)
+			qtx_sch |= MTK_QTX_SCH_MAX_RATE_EN_V3;
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_WEIGHT_V3, weight);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_MAN_V3, max_rate);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_EXP_V3, max_exp);
+	} else {
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_MAN, min_rate);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MIN_RATE_EXP, min_exp);
+		if (max_enable)
+			qtx_sch |= MTK_QTX_SCH_MAX_RATE_EN;
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_WEIGHT, weight);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_MAN, max_rate);
+		qtx_sch |= FIELD_PREP(MTK_QTX_SCH_MAX_RATE_EXP, max_exp);
+	}
 	mtk_w32(eth, qtx_sch, soc->reg_map->qdma.qtx_sch +
 			      (id % MTK_QTX_PER_PAGE) * MTK_QTX_OFFSET);
 
@@ -928,88 +947,90 @@ err_copy:
 	return -EFAULT;
 }
 
-static void gdm_reg_dump_v3(struct mtk_eth *eth, u32 gdm_id, u32 mib_base)
+static void gdm_reg_dump_v3(struct seq_file *seq, struct mtk_eth *eth,
+			    u32 gdm_id, u32 mib_base)
 {
-	pr_info("| GDMA%d_RX_GBCNT  : %010u (Rx Good Bytes)	|\n",
-		gdm_id, mtk_r32(eth, mib_base));
-	pr_info("| GDMA%d_RX_GPCNT  : %010u (Rx Good Pkts)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x08));
-	pr_info("| GDMA%d_RX_OERCNT : %010u (overflow error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x10));
-	pr_info("| GDMA%d_RX_FERCNT : %010u (FCS error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x14));
-	pr_info("| GDMA%d_RX_SERCNT : %010u (too short)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x18));
-	pr_info("| GDMA%d_RX_LERCNT : %010u (too long)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x1C));
-	pr_info("| GDMA%d_RX_CERCNT : %010u (checksum error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x20));
-	pr_info("| GDMA%d_RX_FCCNT  : %010u (flow control)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x24));
-	pr_info("| GDMA%d_RX_VDPCNT : %010u (VID drop)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x28));
-	pr_info("| GDMA%d_RX_PFCCNT : %010u (priority flow control)\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x2C));
-	pr_info("| GDMA%d_TX_GBCNT  : %010u (Tx Good Bytes)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x40));
-	pr_info("| GDMA%d_TX_GPCNT  : %010u (Tx Good Pkts)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x48));
-	pr_info("| GDMA%d_TX_SKIPCNT: %010u (abort count)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x50));
-	pr_info("| GDMA%d_TX_COLCNT : %010u (collision count)|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x54));
-	pr_info("| GDMA%d_TX_OERCNT : %010u (overflow error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x58));
-	pr_info("| GDMA%d_TX_FCCNT  : %010u (flow control)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x60));
-	pr_info("| GDMA%d_TX_PFCCNT : %010u (priority flow control)\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x64));
-	pr_info("|						|\n");
+	seq_printf(seq, "| GDMA%d_RX_GBCNT  : %010u (Rx Good Bytes)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base));
+	seq_printf(seq, "| GDMA%d_RX_GPCNT  : %010u (Rx Good Pkts)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x08));
+	seq_printf(seq, "| GDMA%d_RX_OERCNT : %010u (overflow error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x10));
+	seq_printf(seq, "| GDMA%d_RX_FERCNT : %010u (FCS error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x14));
+	seq_printf(seq, "| GDMA%d_RX_SERCNT : %010u (too short)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x18));
+	seq_printf(seq, "| GDMA%d_RX_LERCNT : %010u (too long)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x1C));
+	seq_printf(seq, "| GDMA%d_RX_CERCNT : %010u (checksum error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x20));
+	seq_printf(seq, "| GDMA%d_RX_FCCNT  : %010u (flow control)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x24));
+	seq_printf(seq, "| GDMA%d_RX_VDPCNT : %010u (VID drop)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x28));
+	seq_printf(seq, "| GDMA%d_RX_PFCCNT : %010u (priority flow control)\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x2C));
+	seq_printf(seq, "| GDMA%d_TX_GBCNT  : %010u (Tx Good Bytes)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x40));
+	seq_printf(seq, "| GDMA%d_TX_GPCNT  : %010u (Tx Good Pkts)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x48));
+	seq_printf(seq, "| GDMA%d_TX_SKIPCNT: %010u (abort count)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x50));
+	seq_printf(seq, "| GDMA%d_TX_COLCNT : %010u (collision count)|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x54));
+	seq_printf(seq, "| GDMA%d_TX_OERCNT : %010u (overflow error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x58));
+	seq_printf(seq, "| GDMA%d_TX_FCCNT  : %010u (flow control)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x60));
+	seq_printf(seq, "| GDMA%d_TX_PFCCNT : %010u (priority flow control)\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x64));
+	seq_puts(seq, "|						|\n");
 }
 
-static void gdm_reg_dump_v2(struct mtk_eth *eth, u32 gdm_id, u32 mib_base)
+static void gdm_reg_dump_v2(struct seq_file *seq, struct mtk_eth *eth,
+			    u32 gdm_id, u32 mib_base)
 {
-	pr_info("| GDMA%d_RX_GBCNT  : %010u (Rx Good Bytes)	|\n",
-		gdm_id, mtk_r32(eth, mib_base));
-	pr_info("| GDMA%d_RX_GPCNT  : %010u (Rx Good Pkts)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x08));
-	pr_info("| GDMA%d_RX_OERCNT : %010u (overflow error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x10));
-	pr_info("| GDMA%d_RX_FERCNT : %010u (FCS error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x14));
-	pr_info("| GDMA%d_RX_SERCNT : %010u (too short)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x18));
-	pr_info("| GDMA%d_RX_LERCNT : %010u (too long)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x1C));
-	pr_info("| GDMA%d_RX_CERCNT : %010u (checksum error)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x20));
-	pr_info("| GDMA%d_RX_FCCNT  : %010u (flow control)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x24));
-	pr_info("| GDMA%d_TX_SKIPCNT: %010u (abort count)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x28));
-	pr_info("| GDMA%d_TX_COLCNT : %010u (collision count)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x2C));
-	pr_info("| GDMA%d_TX_GBCNT  : %010u (Tx Good Bytes)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x30));
-	pr_info("| GDMA%d_TX_GPCNT  : %010u (Tx Good Pkts)	|\n",
-		gdm_id, mtk_r32(eth, mib_base + 0x38));
-	pr_info("|						|\n");
+	seq_printf(seq, "| GDMA%d_RX_GBCNT  : %010u (Rx Good Bytes)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base));
+	seq_printf(seq, "| GDMA%d_RX_GPCNT  : %010u (Rx Good Pkts)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x08));
+	seq_printf(seq, "| GDMA%d_RX_OERCNT : %010u (overflow error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x10));
+	seq_printf(seq, "| GDMA%d_RX_FERCNT : %010u (FCS error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x14));
+	seq_printf(seq, "| GDMA%d_RX_SERCNT : %010u (too short)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x18));
+	seq_printf(seq, "| GDMA%d_RX_LERCNT : %010u (too long)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x1C));
+	seq_printf(seq, "| GDMA%d_RX_CERCNT : %010u (checksum error)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x20));
+	seq_printf(seq, "| GDMA%d_RX_FCCNT  : %010u (flow control)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x24));
+	seq_printf(seq, "| GDMA%d_TX_SKIPCNT: %010u (abort count)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x28));
+	seq_printf(seq, "| GDMA%d_TX_COLCNT : %010u (collision count)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x2C));
+	seq_printf(seq, "| GDMA%d_TX_GBCNT  : %010u (Tx Good Bytes)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x30));
+	seq_printf(seq, "| GDMA%d_TX_GPCNT  : %010u (Tx Good Pkts)	|\n",
+		   gdm_id, mtk_r32(eth, mib_base + 0x38));
+	seq_puts(seq, "|						|\n");
 }
 
-static void gdm_cnt_read(struct mtk_eth *eth)
+static void gdm_cnt_read(struct seq_file *seq, struct mtk_eth *eth)
 {
 	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
 	struct mtk_hw_stats *hw_stats;
 	u32 i, mib_base;
 
-	pr_info("\n			<<CPU>>\n");
-	pr_info("			   |\n");
-	pr_info("+-----------------------------------------------+\n");
-	pr_info("|		  <<PSE>>		        |\n");
-	pr_info("+-----------------------------------------------+\n");
-	pr_info("			   |\n");
-	pr_info("+-----------------------------------------------+\n");
-	pr_info("|		  <<GDMA>>		        |\n");
+	seq_puts(seq, "\n			<<CPU>>\n");
+	seq_puts(seq, "			   |\n");
+	seq_puts(seq, "+-----------------------------------------------+\n");
+	seq_puts(seq, "|		  <<PSE>>		        |\n");
+	seq_puts(seq, "+-----------------------------------------------+\n");
+	seq_puts(seq, "			   |\n");
+	seq_puts(seq, "+-----------------------------------------------+\n");
+	seq_puts(seq, "|		  <<GDMA>>		        |\n");
 
 	for (i = 0; i < MTK_MAX_DEVS; i++) {
 		if (!eth->mac[i] || !eth->mac[i]->hw_stats)
@@ -1020,12 +1041,12 @@ static void gdm_cnt_read(struct mtk_eth *eth)
 		mib_base = reg_map->gdm1_cnt + hw_stats->reg_offset * i;
 
 		if (mtk_is_netsys_v3_or_greater(eth))
-			gdm_reg_dump_v3(eth, i + 1, mib_base);
+			gdm_reg_dump_v3(seq, eth, i + 1, mib_base);
 		else
-			gdm_reg_dump_v2(eth, i + 1, mib_base);
+			gdm_reg_dump_v2(seq, eth, i + 1, mib_base);
 	}
 
-	pr_info("+-----------------------------------------------+\n");
+	seq_puts(seq, "+-----------------------------------------------+\n");
 }
 
 void dump_each_port(struct seq_file *seq, struct mtk_eth *eth, u32 base)
@@ -1052,7 +1073,7 @@ int esw_cnt_read(struct seq_file *seq, void *v)
 {
 	struct mtk_eth *eth = g_eth;
 
-	gdm_cnt_read(eth);
+	gdm_cnt_read(seq, eth);
 
 	if (!mt7530_exist(eth))
 		return 0;
@@ -1117,6 +1138,54 @@ static int switch_count_open(struct inode *inode, struct file *file)
 
 static const struct proc_ops switch_count_fops = {
 	.proc_open = switch_count_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release
+};
+
+void mac_mib_dump(struct seq_file *seq, u32 gdm_id)
+{
+	struct mtk_eth *eth = g_eth;
+
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_UC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_UC_BYTE_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_MC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_MC_BYTE_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_BC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, TX_BC_BYTE_CNT);
+
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_UC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_UC_BYTE_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_MC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_MC_BYTE_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_BC_PKT_CNT);
+	PRINT_FORMATTED_MAC_MIB64(seq, RX_BC_BYTE_CNT);
+}
+
+int mac_cnt_read(struct seq_file *seq, void *v)
+{
+	int i;
+
+	seq_puts(seq, "+------------------------------------+\n");
+	seq_puts(seq, "|              <<GMAC>>              |\n");
+
+	for (i = MTK_GMAC1_ID; i < MTK_GMAC_ID_MAX; i++) {
+		mac_mib_dump(seq, i);
+		seq_puts(seq, "|                                    |\n");
+	}
+
+	seq_puts(seq, "+------------------------------------+\n");
+
+	return 0;
+}
+
+static int mac_count_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, mac_cnt_read, 0);
+}
+
+static const struct proc_ops mac_count_fops = {
+	.proc_open = mac_count_open,
 	.proc_read = seq_read,
 	.proc_lseek = seq_lseek,
 	.proc_release = single_release
@@ -1270,26 +1339,32 @@ static const struct proc_ops hwtx_ring_fops = {
 int rx_ring_read(struct seq_file *seq, void *v)
 {
 	struct mtk_eth *eth = g_eth;
-	struct mtk_rx_ring *ring = &g_eth->rx_ring[0];
+	struct mtk_rx_ring *ring;
 	struct mtk_rx_dma_v2 *rx_ring;
-	int i = 0;
+	int i = 0, j = 0;
 
-	seq_printf(seq, "next to read: %d\n",
-		   NEXT_DESP_IDX(ring->calc_idx, eth->soc->rx.dma_size));
-	for (i = 0; i < eth->soc->rx.dma_size; i++) {
-		rx_ring = ring->dma + i * eth->soc->rx.desc_size;
+	for (j = 0; j < MTK_MAX_RX_RING_NUM; j++) {
+		ring = &eth->rx_ring[j];
+		if (!ring->dma)
+			continue;
 
-		seq_printf(seq, "%d: %08x %08x %08x %08x", i,
-			   rx_ring->rxd1, rx_ring->rxd2,
-			   rx_ring->rxd3, rx_ring->rxd4);
+		seq_printf(seq, "[Ring%d] next to read: %d\n", j,
+			   NEXT_DESP_IDX(ring->calc_idx, eth->soc->rx.dma_size));
+		for (i = 0; i < ring->dma_size; i++) {
+			rx_ring = ring->dma + i * eth->soc->rx.desc_size;
 
-		if (mtk_is_netsys_v2_or_greater(eth)) {
-			seq_printf(seq, " %08x %08x %08x %08x",
-				   rx_ring->rxd5, rx_ring->rxd6,
-				   rx_ring->rxd7, rx_ring->rxd8);
+			seq_printf(seq, "%04d: %08x %08x %08x %08x", i,
+				   rx_ring->rxd1, rx_ring->rxd2,
+				   rx_ring->rxd3, rx_ring->rxd4);
+
+			if (mtk_is_netsys_v3_or_greater(eth)) {
+				seq_printf(seq, " %08x %08x %08x %08x",
+					   rx_ring->rxd5, rx_ring->rxd6,
+					   rx_ring->rxd7, rx_ring->rxd8);
+			}
+
+			seq_puts(seq, "\n");
 		}
-
-		seq_puts(seq, "\n");
 	}
 
 	return 0;
@@ -1323,6 +1398,7 @@ int dbg_regs_read(struct seq_file *seq, void *v)
 {
 	struct mtk_eth *eth = g_eth;
 	const struct mtk_reg_map *reg_map = eth->soc->reg_map;
+	u32 i;
 
 	seq_puts(seq, "   <<DEBUG REG DUMP>>\n");
 
@@ -1378,6 +1454,28 @@ int dbg_regs_read(struct seq_file *seq, void *v)
 		   mtk_r32(eth, reg_map->pdma.pcrx_ptr));
 	seq_printf(seq, "| PDMA_DRX_IDX	: %08x |\n",
 		   mtk_r32(eth, reg_map->pdma.pdrx_ptr));
+	if (MTK_HAS_CAPS(eth->soc->caps, MTK_RSS)) {
+		for (i = 1; i < eth->soc->rss_num; i++) {
+			seq_printf(seq, "| PDMA_CRX_IDX%d	: %08x |\n", i,
+				   mtk_r32(eth, reg_map->pdma.pcrx_ptr +
+					   i * MTK_QRX_OFFSET));
+			seq_printf(seq, "| PDMA_DRX_IDX%d	: %08x |\n", i,
+				   mtk_r32(eth, reg_map->pdma.pdrx_ptr +
+					   i * MTK_QRX_OFFSET));
+		}
+	}
+	if (MTK_HAS_CAPS(eth->soc->caps, MTK_HWLRO)) {
+		for (i = 0; i < MTK_HW_LRO_RING_NUM; i++) {
+			seq_printf(seq, "| PDMA_CRX_IDX%d	: %08x |\n",
+				   MTK_HW_LRO_RING(i),
+				   mtk_r32(eth, reg_map->pdma.pcrx_ptr +
+					   MTK_HW_LRO_RING(i) * MTK_QRX_OFFSET));
+			seq_printf(seq, "| PDMA_DRX_IDX%d	: %08x |\n",
+				   MTK_HW_LRO_RING(i),
+				   mtk_r32(eth, reg_map->pdma.pdrx_ptr +
+					   MTK_HW_LRO_RING(i) * MTK_QRX_OFFSET));
+		}
+	}
 	seq_printf(seq, "| QDMA_CTX_IDX	: %08x |\n",
 		   mtk_r32(eth, reg_map->qdma.ctx_ptr));
 	seq_printf(seq, "| QDMA_DTX_IDX	: %08x |\n",
@@ -1421,6 +1519,21 @@ int dbg_regs_read(struct seq_file *seq, void *v)
 			   mtk_r32(eth, MTK_MAC_FSM(2)));
 	}
 
+	if (mtk_is_netsys_v3_or_greater(eth)) {
+		seq_printf(seq, "| XMAC_P1_MCR	: %08x |\n",
+			   mtk_r32(eth, MTK_XMAC_MCR(1)));
+		seq_printf(seq, "| XMAC_P1_STS	: %08x |\n",
+			   mtk_r32(eth, MTK_HAS_CAPS(eth->soc->caps, MTK_XGMAC_V2) ?
+					MTK_XMAC_STS(1) : MTK_XGMAC_STS(1)));
+		if (MTK_HAS_CAPS(eth->soc->caps, MTK_GMAC3_USXGMII)) {
+			seq_printf(seq, "| XMAC_P2_MCR	: %08x |\n",
+				   mtk_r32(eth, MTK_XMAC_MCR(2)));
+			seq_printf(seq, "| XMAC_P2_STS	: %08x |\n",
+				   mtk_r32(eth, MTK_HAS_CAPS(eth->soc->caps, MTK_XGMAC_V2) ?
+						MTK_XMAC_STS(2) : MTK_XGMAC_STS(2)));
+		}
+	}
+
 	if (mtk_is_netsys_v2_or_greater(eth)) {
 		seq_printf(seq, "| FE_CDM1_FSM	: %08x |\n",
 			   mtk_r32(eth, MTK_FE_CDM1_FSM));
@@ -1434,10 +1547,16 @@ int dbg_regs_read(struct seq_file *seq, void *v)
 			   mtk_r32(eth, MTK_FE_CDM5_FSM));
 		seq_printf(seq, "| FE_CDM6_FSM	: %08x |\n",
 			   mtk_r32(eth, MTK_FE_CDM6_FSM));
+		seq_printf(seq, "| FE_CDM7_FSM	: %08x |\n",
+			   mtk_r32(eth, MTK_FE_CDM7_FSM));
 		seq_printf(seq, "| FE_GDM1_FSM	: %08x |\n",
 			   mtk_r32(eth, MTK_FE_GDM1_FSM));
 		seq_printf(seq, "| FE_GDM2_FSM	: %08x |\n",
 			   mtk_r32(eth, MTK_FE_GDM2_FSM));
+		if (mtk_is_netsys_v3_or_greater(eth)) {
+			seq_printf(seq, "| FE_GDM3_FSM	: %08x |\n",
+				   mtk_r32(eth, MTK_FE_GDM3_FSM));
+		}
 		seq_printf(seq, "| SGMII_EFUSE	: %08x |\n",
 			   mtk_dbg_r32(MTK_SGMII_EFUSE));
 		seq_printf(seq, "| SGMII0_RX_CNT : %08x |\n",
@@ -1746,7 +1865,7 @@ int hw_lro_stats_read_wrapper(struct seq_file *seq, void *v)
 {
 	struct mtk_eth *eth = g_eth;
 
-	if (mtk_is_netsys_v2_or_greater(eth))
+	if (mtk_is_netsys_v3_or_greater(eth))
 		hw_lro_stats_read_v2(seq, v);
 	else
 		hw_lro_stats_read_v1(seq, v);
@@ -2013,6 +2132,95 @@ void hw_lro_auto_tlb_dump_v2(struct seq_file *seq, u32 index)
 	}
 }
 
+void hw_lro_auto_tlb_dump_v3(struct seq_file *seq, u32 index)
+{
+	struct mtk_eth *eth = g_eth;
+	u32 val, sport, dport, vld, dip_idx, mode;
+	u32 ipv6[4] = { 0 };
+	u32 ipv4 = 0;
+	int ret;
+
+	/* dump the LRO_DATA table for the specific entry */
+	val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+	val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DATA_BASE + index);
+	val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+	mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+	/* check if the GLO_MEM access is successful */
+	ret = FIELD_GET(MTK_GLO_MEM_CMD, mtk_r32(eth, MTK_GLO_MEM_CTRL));
+	if (ret != 0) {
+		pr_warn("GLO_MEM read/write error\n");
+		return;
+	}
+
+	/* dump the valid entries of the auto-learn table */
+	vld = FIELD_GET(MTK_LRO_DATA_VLD, mtk_r32(eth, MTK_GLO_MEM_DATA(6)));
+	if (vld) {
+		if (index < 5)
+			seq_printf(seq,
+				   "\n===== TABLE Entry: %d (onging) =====\n",
+				   index);
+		else
+			seq_printf(seq,
+				   "\n===== TABLE Entry: %d (candidate) =====\n",
+				   index);
+
+		/* determine the DIP index for the specific entry */
+		dip_idx = FIELD_GET(MTK_LRO_DATA_DIP_IDX, mtk_r32(eth, MTK_GLO_MEM_DATA(5)));
+		/* switch to the LRO_DIP table for the specific DIP index */
+		val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+		val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DIP_BASE + dip_idx);
+		val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+		mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+		/* determine the mode for the specific DIP index */
+		mode = FIELD_GET(MTK_LRO_DIP_MODE, mtk_r32(eth, MTK_GLO_MEM_DATA(4)));
+		/* dump the SIP and DIP */
+		if (mode == MTK_LRO_DIP_IPV4) {
+			val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+			val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DATA_BASE + index);
+			val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+			mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+			ipv4 = mtk_r32(eth, MTK_GLO_MEM_DATA(1));
+			seq_printf(seq, "SIP = 0x%x: (IPv4)\n", ipv4);
+			val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+			val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DIP_BASE + dip_idx);
+			val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+			mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+			ipv4 = mtk_r32(eth, MTK_GLO_MEM_DATA(0));
+			seq_printf(seq, "DIP = 0x%x: (IPv4)\n", ipv4);
+		} else if (mode == MTK_LRO_DIP_IPV6) {
+			val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+			val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DATA_BASE + index);
+			val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+			mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+			ipv6[3] = mtk_r32(eth, MTK_GLO_MEM_DATA(4));
+			ipv6[2] = mtk_r32(eth, MTK_GLO_MEM_DATA(3));
+			ipv6[1] = mtk_r32(eth, MTK_GLO_MEM_DATA(2));
+			ipv6[0] = mtk_r32(eth, MTK_GLO_MEM_DATA(1));
+			seq_printf(seq, "SIP = 0x%x:0x%x:0x%x:0x%x (IPv6)\n",
+				   ipv6[3], ipv6[2], ipv6[1], ipv6[0]);
+			val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+			val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DIP_BASE + dip_idx);
+			val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+			mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+			ipv6[3] = mtk_r32(eth, MTK_GLO_MEM_DATA(3));
+			ipv6[2] = mtk_r32(eth, MTK_GLO_MEM_DATA(2));
+			ipv6[1] = mtk_r32(eth, MTK_GLO_MEM_DATA(1));
+			ipv6[0] = mtk_r32(eth, MTK_GLO_MEM_DATA(0));
+			seq_printf(seq, "DIP = 0x%x:0x%x:0x%x:0x%x (IPv6)\n",
+				   ipv6[3], ipv6[2], ipv6[1], ipv6[0]);
+		}
+
+		/* dump the SPORT and DPORT */
+		val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+		val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_DATA_BASE + index);
+		val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+		mtk_w32(eth, val, MTK_GLO_MEM_CTRL);
+		sport = FIELD_GET(MTK_LRO_DATA_SPORT, mtk_r32(eth, MTK_GLO_MEM_DATA(0)));
+		dport = FIELD_GET(MTK_LRO_DATA_DPORT, mtk_r32(eth, MTK_GLO_MEM_DATA(0)));
+		seq_printf(seq, "TCP SPORT = %d | TCP DPORT = %d\n", sport, dport);
+	}
+}
+
 int hw_lro_auto_tlb_read(struct seq_file *seq, void *v)
 {
 	struct mtk_eth *eth = g_eth;
@@ -2033,8 +2241,12 @@ int hw_lro_auto_tlb_read(struct seq_file *seq, void *v)
 	seq_puts(seq, "[5] = hwlro_stats_enable_ctrl\n\n");
 
 	if (mtk_is_netsys_v3_or_greater(eth)) {
-		for (i = 1; i <= 8; i++)
-			hw_lro_auto_tlb_dump_v2(seq, i);
+		for (i = 1; i <= 8; i++) {
+			if (MTK_HAS_CAPS(eth->soc->caps, MTK_GLO_MEM_ACCESS))
+				hw_lro_auto_tlb_dump_v3(seq, i);
+			else
+				hw_lro_auto_tlb_dump_v2(seq, i);
+		}
 	} else {
 		/* Read valid entries of the auto-learn table */
 		mtk_w32(eth, 0, MTK_FE_ALT_CF8);
@@ -2054,23 +2266,33 @@ int hw_lro_auto_tlb_read(struct seq_file *seq, void *v)
 	seq_puts(seq, "\nHW LRO Ring Settings\n");
 
 	for (i = 1; i <= MTK_HW_LRO_RING_NUM; i++) {
-		reg_op1 = mtk_r32(eth, MTK_LRO_CTRL_DW1_CFG(i));
-		reg_op2 = mtk_r32(eth, MTK_LRO_CTRL_DW2_CFG(i));
-		reg_op3 = mtk_r32(eth, MTK_LRO_CTRL_DW3_CFG(i));
+		if (MTK_HAS_CAPS(eth->soc->caps, MTK_GLO_MEM_ACCESS)) {
+			reg_val = FIELD_PREP(MTK_GLO_MEM_IDX, MTK_LRO_MEM_IDX);
+			reg_val |= FIELD_PREP(MTK_GLO_MEM_ADDR, MTK_LRO_MEM_CFG_BASE + i);
+			reg_val |= FIELD_PREP(MTK_GLO_MEM_CMD, MTK_GLO_MEM_READ);
+			mtk_w32(eth, reg_val, MTK_GLO_MEM_CTRL);
+			agg_cnt = FIELD_GET(MTK_RING_MAX_AGG_CNT,
+					    mtk_r32(eth, MTK_GLO_MEM_DATA(1)));
+			agg_time = FIELD_GET(MTK_RING_MAX_AGG_TIME_V2,
+					     mtk_r32(eth, MTK_GLO_MEM_DATA(0)));
+			age_time = FIELD_GET(MTK_RING_AGE_TIME,
+					     mtk_r32(eth, MTK_GLO_MEM_DATA(0)));
+		} else {
+			reg_op1 = mtk_r32(eth, MTK_LRO_CTRL_DW1_CFG(i));
+			reg_op2 = mtk_r32(eth, MTK_LRO_CTRL_DW2_CFG(i));
+			reg_op3 = mtk_r32(eth, MTK_LRO_CTRL_DW3_CFG(i));
+
+			agg_cnt = ((reg_op3 & 0x3) << 6) |
+				   ((reg_op2 >> MTK_LRO_RING_AGG_CNT_L_OFFSET) & 0x3f);
+			agg_time = (reg_op2 >> MTK_LRO_RING_AGG_TIME_OFFSET) & 0xffff;
+			age_time = ((reg_op2 & 0x3f) << 10) |
+				    ((reg_op1 >> MTK_LRO_RING_AGE_TIME_L_OFFSET) & 0x3ff);
+		}
 		reg_op4 = mtk_r32(eth, MTK_PDMA_LRO_CTRL_DW2);
 
-		agg_cnt =
-		    ((reg_op3 & 0x3) << 6) |
-		    ((reg_op2 >> MTK_LRO_RING_AGG_CNT_L_OFFSET) & 0x3f);
-		agg_time = (reg_op2 >> MTK_LRO_RING_AGG_TIME_OFFSET) & 0xffff;
-		age_time =
-		    ((reg_op2 & 0x3f) << 10) |
-		    ((reg_op1 >> MTK_LRO_RING_AGE_TIME_L_OFFSET) & 0x3ff);
 		seq_printf(seq,
 			   "Ring[%d]: MAX_AGG_CNT=%d, AGG_TIME=%d, AGE_TIME=%d, Threshold=%d\n",
-			   !(mtk_is_netsys_v2_or_greater(eth)) ?
-			   i : i+3,
-			   agg_cnt, agg_time, age_time, reg_op4);
+			   MTK_HW_LRO_RING(i - 1), agg_cnt, agg_time, age_time, reg_op4);
 	}
 
 	seq_puts(seq, "\n");
@@ -2092,7 +2314,7 @@ static const struct proc_ops hw_lro_auto_tlb_fops = {
 };
 
 struct proc_dir_entry *proc_reg_dir;
-static struct proc_dir_entry *proc_esw_cnt, *proc_xfi_cnt,
+static struct proc_dir_entry *proc_esw_cnt, *proc_mac_cnt, *proc_xfi_cnt,
 			     *proc_dbg_regs, *proc_reset_event;
 
 int debug_proc_init(struct mtk_eth *eth)
@@ -2123,6 +2345,13 @@ int debug_proc_init(struct mtk_eth *eth)
 		pr_notice("!! FAIL to create %s PROC !!\n", PROCREG_ESW_CNT);
 
 	if (mtk_is_netsys_v3_or_greater(g_eth)) {
+		proc_mac_cnt =
+		    proc_create(PROCREG_MAC_CNT, 0,
+				proc_reg_dir, &mac_count_fops);
+		if (!proc_mac_cnt)
+			pr_notice("!! FAIL to create %s PROC !!\n",
+				  PROCREG_MAC_CNT);
+
 		proc_xfi_cnt =
 		    proc_create(PROCREG_XFI_CNT, 0,
 				proc_reg_dir, &xfi_count_fops);
@@ -2169,6 +2398,9 @@ void debug_proc_exit(void)
 
 	if (proc_esw_cnt)
 		remove_proc_entry(PROCREG_ESW_CNT, proc_reg_dir);
+
+	if (proc_mac_cnt)
+		remove_proc_entry(PROCREG_MAC_CNT, proc_reg_dir);
 
 	if (proc_xfi_cnt)
 		remove_proc_entry(PROCREG_XFI_CNT, proc_reg_dir);
