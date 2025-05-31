@@ -16,7 +16,7 @@ index 11c0cb3202..e9e949edf1 100644
  feeds:
    - name: feed_mediatek
 -    uri: https://gitlab.com/prpl-foundation/prplos/feeds/feed-mediatek
--    revision: main@867459488e393e2d64e2a562fd6e1102535e371f
+-    revision: main@a7f3d2f04ecc36e397ae15cb7c2d70821215a713
 +    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
 +    tracking_branch: master
 +    revision: # <need to replace with commit hash>
