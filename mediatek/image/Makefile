@@ -33,11 +33,34 @@ define Device/Default
 	pad-rootfs | append-metadata
 endef
 
+# build fw-ar-ver
+get_fw_ar_ver = \
+  $(if $(wildcard $(2)),$(shell rm -rf $(2))) \
+  $(if $(wildcard $(1)),$(info $(shell $(STAGING_DIR_HOST)/bin/ar-tool fw_ar_table create_ar_conf $(1) $(2)))) \
+  $(if $(wildcard $(2)),$(eval include $(2))) \
+  $(if $(FW_AR_VER),$(info FW_AR_VER = $(FW_AR_VER)),$(error Firmware anti-rollback version not found))
+
+define Image/fw-ar-ver
+	$(call get_fw_ar_ver,$(TOPDIR)/$(call qstrip,$(CONFIG_ANTI_ROLLBACK_TABLE)), \
+			     $(TOPDIR)/$(call qstrip,$(CONFIG_AUTO_AR_CONF)))
+endef
+
 include $(SUBTARGET).mk
 -include $(SUBTARGET)-extra.mk
 
 define Image/Build
 	$(call Image/Build/$(1),$(1))
+endef
+
+define Build/append-opteenode
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb "/reserved-memory/secmon@43000000" \
+		-tx reg 0 0x43000000 0 $(shell printf "%#x" $$((0x570000 \
+		$(if $(CONFIG_OPTEE_CORE_RESERVED_SHMEM),+ $(CONFIG_OPTEE_RESERVED_SHMEM_SIZE),))))
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware -cp
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -cp
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts compatible "linaro,optee-tz"
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts method "smc"
+	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts status "okay"
 endef
 
 # build squashfs-hashed
@@ -51,8 +74,43 @@ define Build/squashfs-hashed
 		$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb
 endef
 
+define hkdf
+	HOST_BIN=$(STAGING_DIR_HOST)/bin \
+	HOSTPKG_BIN=$(STAGING_DIR_HOSTPKG)/bin \
+	$(TOPDIR)/scripts/fw-enc-hkdf.sh -i $(1) -o $(2) -t $(3)
+endef
+
+define Image/fw-enc-key-derive
+	$(call hkdf,$(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/$(CONFIG_PLAT_KEY_NAME).bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/roe_key.bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/$(CONFIG_ROE_SALT)))
+
+	$(call hkdf,$(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/roe_key.bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/kernel_key.bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/$(CONFIG_KERNEL_SALT)))
+
+	$(call hkdf,$(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/roe_key.bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/rootfs_key.bin), \
+		    $(TOPDIR)/$(call qstrip,$(CONFIG_SBC_KEY_DIR)/$(CONFIG_ROOTFS_SALT)))
+endef
+
+define Build/change-rootdev-to-ramdisk
+	$(STAGING_DIR_HOSTPKG)/bin/fdtget -t s \
+		$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /chosen bootargs | \
+		sed "s/root=[^ ]*/root=\/dev\/ram/" | xargs -I {} \
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput -t s \
+		$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /chosen bootargs "{}"
+endef
+
 define Build/secure-boot
-	$(if $(CONFIG_MTK_SECURE_BOOT),$(call Build/squashfs-hashed))
+	$(if $(CONFIG_MTK_SECURE_BOOT), \
+		$(if $(CONFIG_MTK_FW_ENC_USE_RAMDISK),,$(call Build/squashfs-hashed)))
+	$(if $(CONFIG_PACKAGE_optee-mediatek),$(call Build/append-opteenode))
+	$(if $(CONFIG_MTK_FW_ENC_USE_RAMDISK),$(call Build/change-rootdev-to-ramdisk))
+endef
+
+define Build/secure-boot-initramfs
+	$(if $(CONFIG_PACKAGE_optee-mediatek),$(call Build/append-opteenode))
 endef
 
 $(eval $(call BuildImage))

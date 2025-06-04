@@ -1,0 +1,12 @@
+diff --git a/tools/Makefile b/tools/Makefile
+index 0624b07..c2fbeef 100644
+--- a/tools/Makefile
++++ b/tools/Makefile
+@@ -68,6 +68,7 @@ tools-y += sstrip
+ tools-y += zip
+ tools-y += zlib
+ tools-y += fdt-patch-dm-verify
++tools-y += ar-tool
+ tools-y += zstd
+ tools-$(if $(CONFIG_JSON_CHECKSEC_MITIGATIONS_REPORT),y) += checksec.sh
+ tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS),y) += liblzo

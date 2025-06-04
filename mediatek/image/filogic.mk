@@ -4,6 +4,8 @@ define Image/Prepare
 	# For UBI we want only one extra block
 	rm -f $(KDIR)/ubi_mark
 	echo -ne '\xde\xad\xc0\xde' > $(KDIR)/ubi_mark
+	$(if $(CONFIG_MTK_FW_ENC),$(call Image/fw-enc-key-derive))
+	$(if $(CONFIG_MTK_ANTI_ROLLBACK),$(call Image/fw-ar-ver))
 endef
 
 define Build/mt7981-bl2
@@ -294,12 +296,12 @@ define Device/arcadyan_mozart
   DEVICE_PACKAGES := kmod-hwmon-pwmfan e2fsprogs f2fsck mkf2fs blkid kmod-mt7996-firmware
   KERNEL_LOADADDR := 0x48000000
   KERNEL := kernel-bin | gzip
-  KERNEL_INITRAMFS := kernel-bin | lzma | \
+  KERNEL_INITRAMFS := kernel-bin | lzma | secure-boot-initramfs | \
         fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
   KERNEL_INITRAMFS_SUFFIX := .itb
   IMAGE_SIZE := $$(shell expr 64 + $$(CONFIG_TARGET_ROOTFS_PARTSIZE))m
   IMAGES := sysupgrade.itb
-  IMAGE/sysupgrade.itb := append-kernel | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-with-rootfs | pad-rootfs | append-metadata
+  IMAGE/sysupgrade.itb := append-kernel | secure-boot | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-with-rootfs | pad-rootfs | append-metadata
   SUPPORTED_DEVICES += arcadyan,mozart
 endef
 TARGET_DEVICES += arcadyan_mozart
@@ -1184,7 +1186,7 @@ define Device/mediatek_mt7988a-rfb
   DEVICE_PACKAGES := mt798x-2p5g-phy-firmware-internal kmod-sfp blkid
   KERNEL_LOADADDR := 0x46000000
   KERNEL := kernel-bin | gzip
-  KERNEL_INITRAMFS := kernel-bin | lzma | \
+  KERNEL_INITRAMFS := kernel-bin | lzma | secure-boot-initramfs | \
 	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
   KERNEL_INITRAMFS_SUFFIX := .itb
   KERNEL_IN_UBI := 1

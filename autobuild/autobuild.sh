@@ -26,6 +26,66 @@ mtk_prplos_patch() {
     done
 }
 
+mtk_secure_sdk_patch() {
+    echo -e "\033[1;32m === Applying secure sdk patches... ===\033[0m"
+
+    # Set the patches directory
+    patches_dir="${prplos_root}/autobuild/prplos/secure/patches-base"
+
+    # Apply each .patch file in the patches directory
+    for patch in "${patches_dir}"/*.patch; do
+        if [ -f "$patch" ]; then
+            echo -e "\033[1;34m Applying patch: ${patch}... \033[0m"
+            # Apply the patch
+            patch -p1 < "$patch"
+            if [ $? -ne 0 ]; then
+                echo -e "\033[1;31m Failed to apply patch: ${patch} \033[0m"
+                exit 1
+            fi
+        else
+            echo -e "\033[1;33m No patches found in ${patches_dir} \033[0m"
+        fi
+    done
+}
+
+mtk_secure_feed_patch() {
+    echo -e "\033[1;32m === Applying secure feed patches... ===\033[0m"
+
+    # Set the patches directory
+    patches_dir="${prplos_root}/autobuild/prplos/secure/patches-feeds"
+
+    # Apply each .patch file in the patches directory
+    for patch in "${patches_dir}"/*.patch; do
+        if [ -f "$patch" ]; then
+            echo -e "\033[1;34m Applying patch: ${patch}... \033[0m"
+            # Apply the patch
+            patch -p1 < "$patch"
+            if [ $? -ne 0 ]; then
+                echo -e "\033[1;31m Failed to apply patch: ${patch} \033[0m"
+                exit 1
+            fi
+        else
+            echo -e "\033[1;33m No patches found in ${patches_dir} \033[0m"
+        fi
+    done
+}
+
+mtk_secure_prepare() {
+    echo -e "\033[1;32m === add scripts and mkimage for secure boot... ===\033[0m"
+
+    # Set secure_tool_root variable
+    secure_tool_root=${prplos_root}/autobuild/prplos/secure/tools
+
+    # Copy all files from secure_tool_root to the target directory
+    cp -r ${secure_tool_root}/* ${prplos_root}/tools
+
+    # Set secure_script_root variable
+    secure_script_root=${prplos_root}/autobuild/prplos/secure/scripts
+
+    # Copy all files from secure_script_root to the target directory
+    cp -r ${secure_script_root}/* ${prplos_root}/scripts
+}
+
 change_feed_mtk_revision() {
     echo -e "\033[1;32m === Hack feed_mtk to latest revision... ===\033[0m"
     REPO_URL="https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek"
@@ -66,6 +126,10 @@ echo -e "\033[1;32m === prplos_cmd command: ${prplos_cmd} === \033[0m"
 # Execute the prplos_cmd command
 echo -e "\033[1;32m === Executing prplos_cmd command...=== \033[0m"
 $prplos_cmd
+
+mtk_secure_prepare
+mtk_secure_sdk_patch
+mtk_secure_feed_patch
 
 # Create symbolic link
 if test -d "${prplos_root}/../dl"; then

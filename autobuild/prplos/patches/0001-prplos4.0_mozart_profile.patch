@@ -1,8 +1,8 @@
 diff --git a/profiles/mtk_filogic.yml b/profiles/mtk_filogic.yml
-index 11c0cb3202..e9e949edf1 100644
+index 36b0b01..0f9528d 100644
 --- a/profiles/mtk_filogic.yml
 +++ b/profiles/mtk_filogic.yml
-@@ -1,14 +1,56 @@
+@@ -1,14 +1,67 @@
  ---
  profiles:
 -  - arcadyan_mozart
@@ -20,6 +20,17 @@ index 11c0cb3202..e9e949edf1 100644
 +    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
 +    tracking_branch: master
 +    revision: # <need to replace with commit hash>
++
++additional_packages:
++  - feed: packages
++    packages:
++      - cryptsetup
++      - lvm2
++      - libaio
++      - kmod-dax
++      - kmod-dm
++      - libdevmapper
++      - libpopt
  
  packages:
    - mediatek

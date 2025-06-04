@@ -1,0 +1,31 @@
+diff --git a/lib/aes/aes-encrypt.c b/lib/aes/aes-encrypt.c
+index e74e35e..90e1407 100644
+--- a/lib/aes/aes-encrypt.c
++++ b/lib/aes/aes-encrypt.c
+@@ -84,6 +84,13 @@ int image_aes_add_cipher_data(struct image_cipher_info *info, void *keydest,
+ 	char name[128];
+ 	int ret = 0;
+ 
++	if (!keydest && !info->ivname) {
++		/* At least, store the IV in the FIT image */
++		ret = fdt_setprop(fit, node_noffset, "iv",
++				  info->iv, info->cipher->iv_len);
++		goto done;
++	}
++
+ 	/* Either create or overwrite the named cipher node */
+ 	parent = fdt_subnode_offset(keydest, 0, FIT_CIPHER_NODENAME);
+ 	if (parent == -FDT_ERR_NOTFOUND) {
+diff --git a/tools/image-host.c b/tools/image-host.c
+index 504f234..d5ca5e9 100644
+--- a/tools/image-host.c
++++ b/tools/image-host.c
+@@ -505,7 +505,7 @@ fit_image_process_cipher(const char *keydir, void *keydest, void *fit,
+ 	 * size values
+ 	 * And, if needed, write the iv in the FIT file
+ 	 */
+-	if (keydest) {
++	if (keydest || (!keydest && !info.ivname)) {
+ 		ret = info.cipher->add_cipher_data(&info, keydest, fit, node_noffset);
+ 		if (ret) {
+ 			printf("Failed to add verification data for cipher '%s' in image '%s'\n",
