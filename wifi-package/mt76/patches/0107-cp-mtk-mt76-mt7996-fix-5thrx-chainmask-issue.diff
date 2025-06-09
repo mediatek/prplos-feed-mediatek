@@ -1,0 +1,27 @@
+From 8a8f4e2f0c0f76562e7bbec60c2faf74e0ae262d Mon Sep 17 00:00:00 2001
+From: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
+Date: Fri, 06 Jun 2025 10:40:31 +0800
+Subject: [PATCH] mtk: mt76: mt7996: fix rx chainmask
+
+Since wiphy->available_antennas_tx now accumulates the chainmask of all the
+radios under this wiphy (due to single wiphy), use phy->orig_antenna_mask
+to check whether the antenna_mask has been changed (by the user).
+
+CR-Id: WCNCR00274293
+Signed-off-by: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
+Change-Id: I78249162548f7782702636eea6c9d709c7418be4
+---
+
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+index c82e6eb..fc8864e 100644
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -1392,7 +1392,7 @@
+ 
+ static inline u16 mt7996_rx_chainmask(struct mt7996_phy *phy)
+ {
+-	int max_nss = hweight8(phy->mt76->hw->wiphy->available_antennas_tx);
++	int max_nss = hweight16(phy->orig_antenna_mask);
+ 	int cur_nss = hweight8(phy->mt76->antenna_mask);
+ 	u16 tx_chainmask = phy->mt76->chainmask;
+ 
