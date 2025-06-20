@@ -7,9 +7,7 @@ Since wiphy->available_antennas_tx now accumulates the chainmask of all the
 radios under this wiphy (due to single wiphy), use phy->orig_antenna_mask
 to check whether the antenna_mask has been changed (by the user).
 
-CR-Id: WCNCR00274293
 Signed-off-by: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
-Change-Id: I78249162548f7782702636eea6c9d709c7418be4
 ---
 
 diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h

@@ -1,0 +1,28 @@
+From 7f08a39437f2ffa953b10a0b973cab214b6718a7 Mon Sep 17 00:00:00 2001
+From: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
+Date: Fri, 6 Jun 2025 10:46:35 +0800
+Subject: [PATCH] mtk: mac80211: add 5th TRX support
+
+Add 5th TRX support
+
+Signed-off-by: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
+---
+ include/net/cfg80211.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 94cb8165..7bc746d9 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -2064,7 +2064,7 @@ struct cfg80211_tid_stats {
+ 	struct cfg80211_txq_stats txq_stats;
+ };
+ 
+-#define IEEE80211_MAX_CHAINS	4
++#define IEEE80211_MAX_CHAINS	5
+ 
+ /**
+  * struct station_link_info - station link information
+-- 
+2.45.2
+

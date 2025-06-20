@@ -19,24 +19,19 @@ cd prplos
 ```
 
 #### 2. prplOS MTK Changes (Extra Patches)
-Additional patches need to be applied to support Kernel 6.6:
+Additional patches need to be applied.
 
-**0001-prplos3.2_support_mozart_kernel6.6.patch**
-- Apply the necessary prplos patch to support Kernel 6.6.
-- Forcibly use the kernel target in feed_mediatek.
+**0001-prplos4.0_mozart_profile.patch**
 - Fix package dependency issues (WiFi scripts).
-- Add the mtk_filogic profile.
+- Add the mtk_filogic profile and necessary package.
 
-**0002-disable_tr181_mcastd.patch**
-- The tr181 prpl feed package would lead to a kernel crash on Kernel 6.6.
-
-**0003-gen-fit-fix.patch**
+**0002-gen-fit-fix.patch**
 - Fix random rootfs corruption in FIT image
 
-**0004-add-netfilter-netlink-ftnl-package.patch**
+**0003-add-netfilter-netlink-ftnl-package.patch**
 - For manually deleting flow rule entries.
 
-**0005-package-kernel-add-airoha-an8801sb-phy.patch**
+**0004-package-kernel-add-airoha-an8801sb-phy.patch**
 - Add phy-airoha-an8801sb
 
 **0005-uboot-envtools.patch**
@@ -45,6 +40,9 @@ Additional patches need to be applied to support Kernel 6.6:
 git clone https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
 for patch in prplos-feed-mediatek/autobuild/prplos/patches/*.patch; do patch -p1 < "$patch"; done
 ```
+
+Please note that the necessary prplos patches to support Kernel 6.6 have been upstreamed as of May 20, 2025.
+The base revision should be later than this date in mainline-23.05.
 
 #### 3. Update the mtk_filogic.yml File
 Select the fixed revision or just to follow the latest revision, execute the following command:
