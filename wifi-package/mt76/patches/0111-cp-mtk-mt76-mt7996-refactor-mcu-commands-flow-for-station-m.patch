@@ -1,0 +1,88 @@
+From f1a8a7a7673b95b4eb79f56227ea940b2213b52b Mon Sep 17 00:00:00 2001
+From: Peter Chiu <chui-hao.chiu@mediatek.com>
+Date: Wed, 18 Jun 2025 13:26:13 +0800
+Subject: [PATCH 3/3] mt76: mt7996: refactor mcu commands flow for station mode
+
+Fix two possible issues
+1. Driver needs to update BMC STAREC before UC STAREC.
+When configuring UC STAREC, it would init RA algo based on STA cap
+and BSS cap. The BSS cap is stored in BMC STAREC so driver needs to
+update BMC STAREC before UC STAREC.
+2. Remove BMC STAREC when CHANGED_BSSID and the bssid is null.
+Driver needs to remove BMC STAREC when station disconnect to the
+AP. Without this patch, station cannot update the mac address when it
+connect to the other AP with different mac address,
+
+Signed-off-by: Peter Chiu <chui-hao.chiu@mediatek.com>
+---
+ mt7996/main.c | 40 ++++++++++++----------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
+
+diff --git a/mt7996/main.c b/mt7996/main.c
+index cbc87867..3872b82a 100644
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -979,34 +979,6 @@ static void
+ mt7996_vif_cfg_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+ 		       u64 changed)
+ {
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-
+-	mutex_lock(&dev->mt76.mutex);
+-
+-	if ((changed & BSS_CHANGED_ASSOC) && vif->cfg.assoc) {
+-		struct ieee80211_bss_conf *link_conf;
+-		unsigned long link_id;
+-
+-		for_each_vif_active_link(vif, link_conf, link_id) {
+-			struct mt7996_vif_link *link;
+-
+-			link = mt7996_vif_link(dev, vif, link_id);
+-			if (!link)
+-				continue;
+-
+-			if (!link->phy)
+-				continue;
+-
+-			mt7996_mcu_add_bss_info(link->phy, vif, link_conf,
+-						&link->mt76, &link->msta_link,
+-						true);
+-			mt7996_mcu_add_sta(dev, vif, link_conf, NULL, link, NULL,
+-					   CONN_STATE_PORT_SECURE,
+-					   !!(changed & BSS_CHANGED_BSSID));
+-		}
+-	}
+-
+-	mutex_unlock(&dev->mt76.mutex);
+ }
+ 
+ static void mt7996_get_tsf_offset(struct ieee80211_vif *vif,
+@@ -1068,6 +1040,9 @@ mt7996_link_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+ 				   CONN_STATE_PORT_SECURE,
+ 				   !!(changed & BSS_CHANGED_BSSID));
+ 	}
++	if (changed & BSS_CHANGED_BSSID && is_zero_ether_addr(info->bssid))
++		mt7996_mcu_add_sta(dev, vif, info, NULL, link, &link->msta_link,
++				   CONN_STATE_DISCONNECT, false);
+ 
+ 	if (changed & BSS_CHANGED_ERP_SLOT) {
+ 		int slottime = info->use_short_slot ? 9 : 20;
+@@ -1391,6 +1366,15 @@ mt7996_mac_sta_add_links(struct mt7996_dev *dev, struct ieee80211_vif *vif,
+ 		if (!mconf || !conf || !link_sta)
+ 			continue;
+ 
++		/* Update bss capability after associated and before add station */
++		if (vif->type == NL80211_IFTYPE_STATION) {
++			mt7996_mcu_add_bss_info(mconf->phy, vif, conf,
++						&mconf->mt76, &mconf->msta_link,
++						true);
++			mt7996_mcu_add_sta(dev, vif, conf, NULL, mconf, NULL,
++					   CONN_STATE_PORT_SECURE, true);
++		}
++
+ 		ret = mt7996_mac_sta_init_link(dev, conf, link_sta, mconf, assoc);
+ 		if (ret)
+ 			goto error;
+-- 
+2.45.2
+
