@@ -1,4 +1,4 @@
-From 99061dd9ca2709d3d6eb32fa32e1775d38e10757 Mon Sep 17 00:00:00 2001
+From 7f07fb3023f4c979e63eaf33596ded71071e7b18 Mon Sep 17 00:00:00 2001
 From: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
 Date: Tue, 3 Jun 2025 13:37:39 +0800
 Subject: [PATCH] mtk: mt76: mt7996: fix tx non-stop issue when radar is
@@ -10,8 +10,10 @@ When the RDD detection mode is set to 1, FW will avoid stopping TX during radar
 detection.
 This patch need to upstream
 
-The RDD_DET_MODE will move to mt76 vendor part in the following patch for user
-to trigger it via hostapd_cli cmd.
+FW require this additional cmd to resume TXQ.
+Add radar detected log in driver to notify that the TXQ is paused until
+channel switch is finished, for debugging purposes.
+Also, resume the TXQ when stopping a phy for error handling.
 
 Signed-off-by: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
 ---

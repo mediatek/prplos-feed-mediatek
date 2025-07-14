@@ -74,7 +74,28 @@ feeds:
 ```
 Note: to include extra developer tools in the final image (tcpdump, strace, gdb), you can add "debug" as an extra profile while invoking the gen_config.py script.
 
-#### 5. Build prplOS image.
+#### 5. Secure Boot Related Changes (Skip this feature if you don't need it)
+Add secure boot related tools and scripts:
+
+```bash
+cp -r ./prplos-feed-mediatek/autobuild/prplos/secure/tools/* ./tools
+cp -r ./prplos-feed-mediatek/autobuild/prplos/secure/scripts/* ./scripts
+```
+
+Apply secure SDK patches:
+
+```bash
+for patch in prplos-feed-mediatek/autobuild/prplos/secure/patches-base/*.patch; do patch -p1 < "$patch"; done
+```
+
+Apply secure feeds patches:
+
+```bash
+for patch in prplos-feed-mediatek/autobuild/prplos/secure/patches-feeds/*.patch; do patch -p1 < "$patch"; done
+```
+
+
+#### 6. Build prplOS image.
 ```bash
 make -j32
 ```
@@ -90,11 +111,12 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 ![feed_mediatek_layout](feed_mtk_layout.png)
 
 ## Feed-Mediatek Prpl Release
-- Date: 2025-05-09
+- Date: 2025-06-10
 - Modified By: Evelyn Tsai (evelyn.tsai@mediatek.com)
 ### Release History
 | Date       | OpenWrt Source   |
 |------------|------------------|
+| 2025.06.10 | Add Filogic880 secure boot support |
 | 2025.05.09 | Sync from [OpenWrt WiFi7 MP4.1 Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/#filogic-880_860-wifi7-mp4_1-release-2025_04_25) |
 | 2025.03.27 | Sync from [OpenWrt WiFi7 Beta Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/#filogic-880-wifi7-beta-release-2025_03_07) |
 
@@ -104,7 +126,7 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 | 6.34.x | Support Single hostapd process but NOT support MLO config |
 | 7.6.x | support AP MLD, STA MLD, but NOT support WPS onboarding through MLD |
 
-Please note that the latest pWHM v7.6.14 still has issues detecting the MLD capability of wiphy.
+Please note that the latest pWHM v7.6.19 still has issues detecting the MLD capability of wiphy.
 And also the WPS over MLO onboarding. You need to apply this patch manually to set up AP MLD
 
 ```
@@ -167,4 +189,4 @@ These patches do not guarantee quality and have only been verified to pass basic
 For a complete pWHM integration that meets commercial quality standards, please ensure it is performed by a third-party software integration vendor.
 
 ## Roadmap
-Next Revision Release: around 2025/6/M for secure boot
+Next Revision Release: around late September 2025 and for PrplOS4.1 and will add support for Filogic850 platform.
