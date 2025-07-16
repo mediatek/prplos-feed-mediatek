@@ -9,6 +9,15 @@ It is more convenient for the driver to leave the chainmask unshifted, as
 the shifted chainmask is only used for radio->antenna_mask and
 wiphy->available_antennas_t(r)x.
 
+[0716 update]
+When there is no STA connected, the RSSI signal of a frame calculated
+by mt76_rx_signal becomes 0, as the RSSI of the 5th RX is set to 0.
+Therefore, set the RSSI of the 5th RX to the mininum value = -128 to avoid
+polluting the RSSI signal.
+For example, the auth and assoc resp frame sent from the STA will have
+an RSSI of 0, which causes the rssi_reject_assoc_rssi
+check to fail due to inaccurate rssi values.
+
 Signed-off-by: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
 ---
  mt76.h            | 13 +++++------
@@ -206,7 +215,7 @@ index ce942ef8..b6109673 100644
  		status->chain_signal[2] = to_rssi(MT_PRXV_RCPI2, v3);
  		status->chain_signal[3] = to_rssi(MT_PRXV_RCPI3, v3);
 +		/* no 5th rx info in rxd for data frame */
-+		status->chain_signal[4] = 0;
++		status->chain_signal[4] = -128;
  
  		if (msta_link) {
 +			u16 rx_mask = status->chains;
