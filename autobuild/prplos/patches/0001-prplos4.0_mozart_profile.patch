@@ -2,7 +2,7 @@ diff --git a/profiles/mtk_filogic.yml b/profiles/mtk_filogic.yml
 index 36b0b01..0f9528d 100644
 --- a/profiles/mtk_filogic.yml
 +++ b/profiles/mtk_filogic.yml
-@@ -1,14 +1,67 @@
+@@ -1,14 +1,69 @@
  ---
  profiles:
 -  - arcadyan_mozart
@@ -34,6 +34,8 @@ index 36b0b01..0f9528d 100644
  
  packages:
    - mediatek
++  - kmod-mt7992-firmware
++  - kmod-mt7992-23-firmware
 +  - kmod-mt7996-firmware
 +  - kmod-mt7996-233-firmware
 +  - kmod-mt7996e
