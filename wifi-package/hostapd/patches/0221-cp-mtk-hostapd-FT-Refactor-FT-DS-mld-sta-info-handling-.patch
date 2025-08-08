@@ -1,0 +1,50 @@
+From 8ed66d149bc8d41982b3a444bcde80e3f5b3096d Mon Sep 17 00:00:00 2001
+From: Allen Ye <allen.ye@mediatek.com>
+Date: Thu, 24 Jul 2025 15:47:01 +0800
+Subject: [PATCH 221/226] mtk: hostapd: FT: Refactor FT-DS mld sta info
+ handling in assoc
+
+Fix sta with the same mld and link address roaming failed using 11r otd,
+due to the station entry is not set as mld in that case.
+
+wpa_sm->mld_assoc_link_id is set as first link when receive auth action.
+Correct the link id when when processing the reassoc.
+
+Signed-off-by: Allen Ye <allen.ye@mediatek.com>
+---
+ src/ap/ieee802_11.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/ap/ieee802_11.c b/src/ap/ieee802_11.c
+index ac482b702..29c2ed2dc 100644
+--- a/src/ap/ieee802_11.c
++++ b/src/ap/ieee802_11.c
+@@ -5600,7 +5600,6 @@ static struct sta_info * handle_mlo_translate(struct hostapd_data *hapd,
+ 	/* Reassoc is the first direct frame sent by FTR to target AP via OTD,
+ 	 * thus AP MLD doesn't need to do MLO translate for the non-AP MLD. */
+ 	if (reassoc && sta->ft_over_ds) {
+-		ap_sta_set_mld(sta, true);
+ 		*assoc_hapd = hapd;
+ 		return sta;
+ 	}
+@@ -5747,7 +5746,8 @@ static void handle_assoc(struct hostapd_data *hapd,
+ 		 * Since there is no auth processing in FT-OTD,
+ 		 * the STA MLD info should be filled when receiving reassoc.
+ 		 */
+-		if (sta->ft_over_ds && ap_sta_is_mld(hapd, sta)) {
++		if (sta->ft_over_ds && sta->wpa_sm->mld_assoc_link_id >= 0) {
++			sta->wpa_sm->mld_assoc_link_id = hapd->mld_link_id;
+ 			sta->mld_assoc_link_id = hapd->mld_link_id;
+ 			sta->mld_assoc_sta = sta;
+ 
+@@ -5755,6 +5755,7 @@ static void handle_assoc(struct hostapd_data *hapd,
+ 			 * Set the MLD address as the station address and the
+ 			 * station addresses.
+ 			 */
++			ap_sta_set_mld(sta, true);
+ 			os_memcpy(sta->mld_info.common_info.mld_addr, sta->addr,
+ 				  ETH_ALEN);
+ 			os_memcpy(sta->mld_info.links[hapd->mld_link_id].peer_addr,
+-- 
+2.45.2
+
