@@ -1,0 +1,41 @@
+From edc66cc6dd1291a42a56ce24d8c5336a37cf6370 Mon Sep 17 00:00:00 2001
+From: Shayne Chen <shayne.chen@mediatek.com>
+Date: Tue, 26 Aug 2025 15:03:02 +0800
+Subject: [PATCH 3/4] mtk: hostapd: Sync nl80211.h for
+ NL80211_ATTR_WIPHY_RADIO_INDEX
+
+---
+ src/drivers/nl80211_copy.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/drivers/nl80211_copy.h b/src/drivers/nl80211_copy.h
+index 6fa52ebf8..256ef3972 100644
+--- a/src/drivers/nl80211_copy.h
++++ b/src/drivers/nl80211_copy.h
+@@ -2931,6 +2931,14 @@ enum nl80211_commands {
+  * @NL80211_ATTR_CRTI_UPDATE_EVENT: Type of critical update event for notification
+  *	to userspace, contains a value of enum nl80211_crit_update_event (u8).
+  *
++ * @NL80211_ATTR_WIPHY_RADIO_INDEX: (int) Integer attribute denoting the index
++ *	of the radio in interest. Internally a value of -1 is used to
++ *	indicate that the radio id is not given in user-space. This means
++ *	that all the attributes are applicable to all the radios. If there is
++ *	a radio index provided in user-space, the attributes will be
++ *	applicable to that specific radio only. If the radio id is greater
++ *	thank the number of radios, error denoting invalid value is returned.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3488,6 +3496,8 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_ASSOC_MLD_EXT_CAPA_OPS,
+ 
++	NL80211_ATTR_WIPHY_RADIO_INDEX,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	/* MTK internal */
+-- 
+2.45.2
+

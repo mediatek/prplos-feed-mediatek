@@ -1,0 +1,188 @@
+From 99d99f94cdcda9c01b3af39af24c3ee4b7a60f3c Mon Sep 17 00:00:00 2001
+From: Michael-CY Lee <michael-cy.lee@mediatek.com>
+Date: Wed, 20 Aug 2025 17:01:20 +0800
+Subject: [PATCH 2/4] mtk: hostapd: enhance MLD STA entry recovery and
+ comprehensive cleanup mechanisms
+
+1. use ap_celanup_sta() to safely cleanup STA when receive AUTH from associated STA
+The original function hostapd_ml_handle_disconnect() requires that
+sta_info from the setup link exists; otherwise, it might cause
+hostapd to crash.
+
+The function ap_cleanup_sta() can safely handle such cases.
+
+2. properly call ap_sta_remove_link_sta() before ap_free_sta()
+If the function ap_free_sta() is called only for a single link of a
+STA MLD, especially the setup link, it might cause a use-after-free
+issue. The function ap_sta_remove_link_sta should be called before
+ap_free_sta() to prevent the issue.
+
+3. make sure that hostapd_ml_get_assoc_sta() correctly returns
+The function should reutrn the sta_info from it's setup link
+(ie. sta->mld_assoc_sta == sta); otherwise, it should return NULL.
+
+4. add new function ap_cleanup_sta()
+The purpose of the ap_cleanup_sta() function is to safely clean up the
+data structures of a specific STA at the MLD level.
+This function first clears the WLAN_STA_ASSOC flag from the sta_info on
+all links. As a result, ap_get_sta() will always return the sta_info
+belonging to the input hapd, or NULL. After that, it proceeds to remove
+all sta_info entries on all links.
+This function is especially useful when, due to certain errors, the
+sta_info of the setup link is accidentally deleted while the sta_info of
+other links remain. Using this function allows for safely cleaning up
+the entire STA MLD.
+
+Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
+---
+ src/ap/ieee802_11.c        |  2 +-
+ src/ap/ieee802_11_shared.c |  9 +++----
+ src/ap/sta_info.c          | 49 +++++++++++++++++++++++++++++++++++++-
+ src/ap/sta_info.h          |  1 +
+ 4 files changed, 55 insertions(+), 6 deletions(-)
+
+diff --git a/src/ap/ieee802_11.c b/src/ap/ieee802_11.c
+index 446a1ef8f..ad6099c63 100644
+--- a/src/ap/ieee802_11.c
++++ b/src/ap/ieee802_11.c
+@@ -3235,7 +3235,7 @@ static void handle_auth(struct hostapd_data *hapd,
+ 				   "receive AUTH from associated STA "MACSTR
+ 				   ", do deauthentication\n",
+ 				   MAC2STR(sa));
+-			hostapd_ml_handle_disconnect(hapd, sta, mgmt, false);
++			ap_cleanup_sta(hapd, sa);
+ 			hostapd_drv_sta_remove(hapd, sa);
+ 			resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+ 			sta = NULL;
+diff --git a/src/ap/ieee802_11_shared.c b/src/ap/ieee802_11_shared.c
+index 18f65c4e4..3b0a962c6 100644
+--- a/src/ap/ieee802_11_shared.c
++++ b/src/ap/ieee802_11_shared.c
+@@ -1210,14 +1210,15 @@ struct sta_info * hostapd_ml_get_assoc_sta(struct hostapd_data *hapd,
+ 	*assoc_hapd = hapd;
+ 
+ 	/* The station is the one on which the association was performed */
+-	if (sta->mld_assoc_link_id == hapd->mld_link_id)
++	if (sta->mld_assoc_link_id == hapd->mld_link_id &&
++	    sta == sta->mld_assoc_sta)
+ 		return sta;
+ 
+ 	other_hapd = hostapd_mld_get_link_bss(hapd, sta->mld_assoc_link_id);
+ 	if (!other_hapd) {
+ 		wpa_printf(MSG_DEBUG, "MLD: No link match for link_id=%u",
+ 			   sta->mld_assoc_link_id);
+-		return sta;
++		return NULL;
+ 	}
+ 
+ 	/*
+@@ -1226,14 +1227,14 @@ struct sta_info * hostapd_ml_get_assoc_sta(struct hostapd_data *hapd,
+ 	 */
+ 	for (tmp_sta = other_hapd->sta_list; tmp_sta; tmp_sta = tmp_sta->next) {
+ 		if (tmp_sta->mld_assoc_link_id == sta->mld_assoc_link_id &&
+-		    tmp_sta->aid == sta->aid) {
++		    tmp_sta->aid == sta->aid && tmp_sta->mld_assoc_sta == tmp_sta) {
+ 			*assoc_hapd = other_hapd;
+ 			return tmp_sta;
+ 		}
+ 	}
+ #endif /* CONFIG_IEEE80211BE */
+ 
+-	return sta;
++	return NULL;
+ }
+ 
+ 
+diff --git a/src/ap/sta_info.c b/src/ap/sta_info.c
+index c27f8ded2..1029cf787 100644
+--- a/src/ap/sta_info.c
++++ b/src/ap/sta_info.c
+@@ -522,6 +522,8 @@ void hostapd_free_stas(struct hostapd_data *hapd)
+ 		sta = sta->next;
+ 		wpa_printf(MSG_DEBUG, "Removing station " MACSTR,
+ 			   MAC2STR(prev->addr));
++		if (ap_sta_is_mld(hapd, prev))
++			ap_sta_remove_link_sta(hapd, prev);
+ 		ap_free_sta(hapd, prev);
+ 	}
+ }
+@@ -766,6 +768,8 @@ static void ap_handle_session_timer(void *eloop_ctx, void *timeout_ctx)
+ 		       "session timeout");
+ 	sta->acct_terminate_cause =
+ 		RADIUS_ACCT_TERMINATE_CAUSE_SESSION_TIMEOUT;
++	if (ap_sta_is_mld(hapd, sta))
++		ap_sta_remove_link_sta(hapd, sta);
+ 	ap_free_sta(hapd, sta);
+ }
+ 
+@@ -840,8 +844,11 @@ static void ap_sta_assoc_timeout(void *eloop_ctx, void *timeout_ctx)
+ 	if (sta->flags & WLAN_STA_AUTH)
+ 		ap_sta_deauthenticate(hapd, sta,
+ 				      WLAN_REASON_PREV_AUTH_NOT_VALID);
+-	else
++	else {
++		if (ap_sta_is_mld(hapd, sta))
++			ap_sta_remove_link_sta(hapd, sta);
+ 		ap_free_sta(hapd, sta);
++	}
+ }
+ 
+ 
+@@ -2041,3 +2048,43 @@ bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta) {
+ 	return false;
+ }
+ 
++void ap_cleanup_sta(struct hostapd_data *hapd, u8 *addr) {
++	struct hostapd_data *h;
++	struct sta_info *sta;
++
++	sta = ap_get_sta(hapd, addr);
++	if (sta)
++		sta->flags &= ~WLAN_STA_ASSOC;
++
++#ifdef CONFIG_IEEE80211BE
++	if (hostapd_is_mld_ap(hapd)) {
++		/* Clear the flag WLAN_STA_ASSOC so that ap_get_sta() must
++		 * return the sta_info of the input hapd or NULL.
++		 */
++		for_each_mld_link(h, hapd) {
++			if (h == hapd)
++				continue;
++
++			sta = ap_get_sta(h, addr);
++			if (!sta)
++				continue;
++
++			sta->flags &= ~WLAN_STA_ASSOC;
++		}
++
++		for_each_mld_link(h, hapd) {
++			if (h == hapd)
++				continue;
++
++			sta = ap_get_sta(h, addr);
++			if (!sta)
++				continue;
++
++			ap_free_sta(h, sta);
++		}
++	}
++#endif /* CONFIG_IEEE80211BE */
++	sta = ap_get_sta(hapd, addr);
++	if (sta)
++		ap_free_sta(hapd, sta);
++}
+diff --git a/src/ap/sta_info.h b/src/ap/sta_info.h
+index d641a4b5d..0d8c02790 100644
+--- a/src/ap/sta_info.h
++++ b/src/ap/sta_info.h
+@@ -436,5 +436,6 @@ void ap_sta_free_sta_profile(struct mld_info *info);
+ 
+ void hostapd_free_link_stas(struct hostapd_data *hapd);
+ bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta);
++void ap_cleanup_sta(struct hostapd_data *hapd, u8 *addr);
+ 
+ #endif /* STA_INFO_H */
+-- 
+2.45.2
+

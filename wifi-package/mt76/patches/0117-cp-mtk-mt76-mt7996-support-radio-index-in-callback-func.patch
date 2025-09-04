@@ -1,0 +1,103 @@
+From 160dfc6cb37f4fd774c241f4b3bb1d915aef32ec Mon Sep 17 00:00:00 2001
+From: Shayne Chen <shayne.chen@mediatek.com>
+Date: Tue, 15 Jul 2025 13:59:47 +0800
+Subject: [PATCH 4/5] mtk: mt76: mt7996 support radio index in callback
+ function
+
+mtk: mt76: mt7996: add radio_idx for .config callback
+mtk: mt76: mt7996: add radio_idx for .set_rts_threshold callback
+mtk: mt76: add radio_idx for .get_antenna callback
+mtk: mt76: mt7996: add radio_idx for .set_antenna callback
+mtk: mt76: mt7996: add radio_idx for .set_coverage_class callback
+
+Dependency with backport (mac80211).
+
+Signed-off-by: Shayne Chen <shayne.chen@mediatek.com>
+---
+ mac80211.c    |  3 ++-
+ mt76.h        |  3 ++-
+ mt7996/main.c | 12 +++++++-----
+ 3 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/mac80211.c b/mac80211.c
+index 0e25d72d..5e07fc88 100644
+--- a/mac80211.c
++++ b/mac80211.c
+@@ -1909,7 +1909,8 @@ void mt76_sw_scan_complete(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+ }
+ EXPORT_SYMBOL_GPL(mt76_sw_scan_complete);
+ 
+-int mt76_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
++int mt76_get_antenna(struct ieee80211_hw *hw, int radio_idx,
++		     u32 *tx_ant, u32 *rx_ant)
+ {
+ 	struct mt76_phy *phy = hw->priv;
+ 	struct mt76_dev *dev = phy->dev;
+diff --git a/mt76.h b/mt76.h
+index 26ef178b..60895f59 100644
+--- a/mt76.h
++++ b/mt76.h
+@@ -1838,7 +1838,8 @@ int mt76_get_sar_power(struct mt76_phy *phy,
+ void mt76_csa_check(struct mt76_dev *dev);
+ void mt76_csa_finish(struct mt76_dev *dev);
+ 
+-int mt76_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant);
++int mt76_get_antenna(struct ieee80211_hw *hw, int radio_idx,
++		     u32 *tx_ant, u32 *rx_ant);
+ int mt76_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set);
+ void mt76_insert_ccmp_hdr(struct sk_buff *skb, u8 key_id);
+ int mt76_get_rate(struct mt76_dev *dev,
+diff --git a/mt7996/main.c b/mt7996/main.c
+index 928e1e92..b485a1d9 100644
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -808,7 +808,7 @@ out:
+ 	return err;
+ }
+ 
+-static int mt7996_config(struct ieee80211_hw *hw, u32 changed)
++static int mt7996_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
+ {
+ 	return 0;
+ }
+@@ -1759,7 +1759,8 @@ unlock:
+ 	rcu_read_unlock();
+ }
+ 
+-static int mt7996_set_rts_threshold(struct ieee80211_hw *hw, u32 val)
++static int mt7996_set_rts_threshold(struct ieee80211_hw *hw, int radio_idx,
++				    u32 value)
+ {
+ 	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+ 	int i, ret;
+@@ -1769,7 +1770,7 @@ static int mt7996_set_rts_threshold(struct ieee80211_hw *hw, u32 val)
+ 	for (i = 0; i < hw->wiphy->n_radio; i++) {
+ 		struct mt7996_phy *phy = dev->radio_phy[i];
+ 
+-		ret = mt7996_mcu_set_rts_thresh(phy, val);
++		ret = mt7996_mcu_set_rts_thresh(phy, value);
+ 		if (ret)
+ 			break;
+ 	}
+@@ -2017,7 +2018,8 @@ unlock:
+ }
+ 
+ static void
+-mt7996_set_coverage_class(struct ieee80211_hw *hw, s16 coverage_class)
++mt7996_set_coverage_class(struct ieee80211_hw *hw, int radio_idx,
++			  s16 coverage_class)
+ {
+ 	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+ 	struct mt7996_phy *phy;
+@@ -2031,7 +2033,7 @@ mt7996_set_coverage_class(struct ieee80211_hw *hw, s16 coverage_class)
+ }
+ 
+ static int
+-mt7996_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
++mt7996_set_antenna(struct ieee80211_hw *hw, int radio_idx, u32 tx_ant, u32 rx_ant)
+ {
+ 	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+ 	struct mt7996_phy *phy;
+-- 
+2.45.2
+
