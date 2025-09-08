@@ -9,8 +9,8 @@ include $(TOPDIR)/rules.mk
 include $(TOPDIR)/feeds/packages/lang/python/python3-version.mk
 
 PKG_NAME:=optee-mediatek
-PKG_VERSION:=4.5.0
-PKG_RELEASE:=4.5.0
+PKG_VERSION:=4.7.0
+PKG_RELEASE:=4.7.0
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -18,6 +18,7 @@ include optee-os.mk
 include optee-client.mk
 include optee-test.mk
 include optee-apps.mk
+include ta-offline-sign.mk
 
 define Package/optee-mediatek
   SECTION:=boot
@@ -31,6 +32,17 @@ define Package/optee-mediatek
 	CONFIG_OPTEE_INSECURE_LOAD_IMAGE=n \
 	CONFIG_OPTEE_SHM_NUM_PRIV_PAGES=1 \
 	CONFIG_TEE=y
+endef
+
+define Package/optee-pkcs11
+  SECTION:=boot
+  CATEGORY:=Boot Loaders
+  TITLE:=optee-pkcs11
+  DEPENDS:=+optee-mediatek +libp11 +opensc-utils +libopensc-pkcs11 +opensc-utils-pkcs11-tool
+endef
+
+define Package/optee-pkcs11/description
+  Enabled this config to use pkcs11 and pkcs11-tool
 endef
 
 define Package/optee-mediatek/description
@@ -104,6 +116,9 @@ define Build/Compile
 ifeq ($(CONFIG_OPTEE_TEST),y)
 	$(call Build/Compile/optee-test)
 endif
+ifeq ($(CONFIG_OPTEE_OFFLINE_SIGN),y)
+	$(call tas-offline-sign)
+endif
 ifeq ($(CONFIG_OPTEE_EARLY_TA),y)
 	$(call Build/Compile/optee-os, EARLY_TA_BUILD)
 endif
@@ -126,6 +141,15 @@ define Package/optee-mediatek/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(CP) $(PKG_BUILD_DIR)/target/* $(1)/
 	$(CP) ./files/optee.init $(1)/etc/init.d/optee
+
+ifeq ($(CONFIG_OPTEE_RPMB_FS),y)
+	$(CP) $(PKG_BUILD_DIR)/$(OPTEE_OS_NAME)/out/arm/core/tee.bin \
+		$(BIN_DIR)/tee-spim-nand.bin
+else
+	$(CP) $(PKG_BUILD_DIR)/$(OPTEE_OS_NAME)/out/arm/core/tee.bin \
+		$(BIN_DIR)/tee-emmc.bin
+endif
 endef
 
 $(eval $(call BuildPackage,optee-mediatek))
+$(eval $(call BuildPackage,optee-pkcs11))

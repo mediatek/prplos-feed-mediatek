@@ -1,41 +1,3 @@
-diff --git a/tools/Makefile b/tools/Makefile
-index e13effb..5d69997 100644
---- a/tools/Makefile
-+++ b/tools/Makefile
-@@ -83,6 +83,8 @@ RSA_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(addprefix lib/rsa/, \
- 					rsa-sign.o rsa-verify.o \
- 					rsa-mod-exp.o)
- 
-+SIGNOFFLINE_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := signoffline.o
-+
- ECDSA_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(addprefix lib/ecdsa/, ecdsa-libcrypto.o)
- 
- AES_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(addprefix lib/aes/, \
-@@ -144,7 +146,8 @@ dumpimage-mkimage-objs := aisimage.o \
- 			mtk_nand_headers.o \
- 			$(ECDSA_OBJS-y) \
- 			$(RSA_OBJS-y) \
--			$(AES_OBJS-y)
-+			$(AES_OBJS-y) \
-+			$(SIGNOFFLINE_OBJS-y)
- 
- dumpimage-objs := $(dumpimage-mkimage-objs) dumpimage.o
- mkimage-objs   := $(dumpimage-mkimage-objs) mkimage.o
-diff --git a/tools/image-host.c b/tools/image-host.c
-index 4a24dee..504f234 100644
---- a/tools/image-host.c
-+++ b/tools/image-host.c
-@@ -153,7 +153,7 @@ static int fit_image_write_sig(void *fit, int noffset, uint8_t *value,
- 					  strdata, sizeof(strdata));
- 		}
- 	}
--	if (algo_name && !ret)
-+	if (algo_name && !strstr(algo_name, ",offline") && !ret)
- 		ret = fdt_setprop_string(fit, noffset, "algo", algo_name);
- 
- 	return ret;
-diff --git a/tools/image-sig-host.c b/tools/image-sig-host.c
-index d0133ae..9c6dc22 100644
 --- a/tools/image-sig-host.c
 +++ b/tools/image-sig-host.c
 @@ -11,6 +11,7 @@
@@ -74,9 +36,27 @@ index d0133ae..9c6dc22 100644
  };
  
  struct padding_algo padding_algos[] = {
-diff --git a/tools/signoffline.c b/tools/signoffline.c
-new file mode 100644
-index 0000000..20bd922
+--- a/tools/Makefile
++++ b/tools/Makefile
+@@ -84,6 +84,8 @@ RSA_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(
+ 					rsa-sign.o rsa-verify.o \
+ 					rsa-mod-exp.o)
+ 
++SIGNOFFLINE_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := signoffline.o
++
+ ECDSA_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(addprefix generated/lib/ecdsa/, ecdsa-libcrypto.o)
+ 
+ AES_OBJS-$(CONFIG_TOOLS_LIBCRYPTO) := $(addprefix generated/lib/aes/, \
+@@ -149,7 +151,8 @@ dumpimage-mkimage-objs := aisimage.o \
+ 			mtk_nand_headers.o \
+ 			$(ECDSA_OBJS-y) \
+ 			$(RSA_OBJS-y) \
+-			$(AES_OBJS-y)
++			$(AES_OBJS-y) \
++			$(SIGNOFFLINE_OBJS-y)
+ 
+ dumpimage-objs := $(dumpimage-mkimage-objs) dumpimage.o
+ mkimage-objs   := $(dumpimage-mkimage-objs) mkimage.o
 --- /dev/null
 +++ b/tools/signoffline.c
 @@ -0,0 +1,292 @@
@@ -372,9 +352,6 @@ index 0000000..20bd922
 +
 +	return ret;
 +}
-diff --git a/tools/signoffline.h b/tools/signoffline.h
-new file mode 100644
-index 0000000..50d188e
 --- /dev/null
 +++ b/tools/signoffline.h
 @@ -0,0 +1,18 @@
@@ -396,4 +373,14 @@ index 0000000..50d188e
 +		   uint8_t *sig, uint sig_len);
 +
 +#endif /* SIGNOFFLINE_H_ */
-
+--- a/tools/image-host.c
++++ b/tools/image-host.c
+@@ -157,7 +157,7 @@ static int fit_image_write_sig(void *fit
+ 					  strdata, sizeof(strdata));
+ 		}
+ 	}
+-	if (algo_name && !ret)
++	if (algo_name && !strstr(algo_name, ",offline") && !ret)
+ 		ret = fdt_setprop_string(fit, noffset, "algo", algo_name);
+ 
+ 	return ret;

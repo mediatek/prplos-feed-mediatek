@@ -15,6 +15,10 @@
 #include <dt-bindings/reset/mediatek,mt7987-resets.h>
 #include <dt-bindings/regulator/richtek,rt5190a-regulator.h>
 
+/* TOPRGU resets */
+#define MT7987_TOPRGU_SGMII0_GRST		1
+#define MT7987_TOPRGU_SGMII1_GRST		2
+
 / {
 	compatible = "mediatek,mt7987";
 	interrupt-parent = <&gic>;
@@ -59,6 +63,7 @@
 				 <&apmixedsys CLK_APMIXED_ARM_LL>;
 			clock-names = "cpu", "intermediate", "armpll";
 			operating-points-v2 = <&cluster0_opp>;
+			#cooling-cells = <2>;
 		};
 
 		cpu1: cpu@1 {
@@ -72,6 +77,7 @@
 				 <&apmixedsys CLK_APMIXED_ARM_LL>;
 			clock-names = "cpu", "intermediate", "armpll";
 			operating-points-v2 = <&cluster0_opp>;
+			#cooling-cells = <2>;
 		};
 
 		cpu2: cpu@2 {
@@ -85,6 +91,7 @@
 				 <&apmixedsys CLK_APMIXED_ARM_LL>;
 			clock-names = "cpu", "intermediate", "armpll";
 			operating-points-v2 = <&cluster0_opp>;
+			#cooling-cells = <2>;
 		};
 
 		cpu3: cpu@3 {
@@ -98,6 +105,7 @@
 				 <&apmixedsys CLK_APMIXED_ARM_LL>;
 			clock-names = "cpu", "intermediate", "armpll";
 			operating-points-v2 = <&cluster0_opp>;
+			#cooling-cells = <2>;
 		};
 
 		cluster0_opp: opp_table0 {
@@ -169,6 +177,8 @@
 				     "syscon",
 				     "simple-mfd";
 			reg = <0 0x10060000 0 0x1000>;
+			resets = <&watchdog MT7987_TOPRGU_SGMII0_GRST>;
+			mediatek,phya_trx_ck;
 			#clock-cells = <1>;
 
 			sgmiipcs0: pcs {
@@ -186,6 +196,8 @@
 				     "syscon",
 				     "simple-mfd";
 			reg = <0 0x10070000 0 0x1000>;
+			resets = <&watchdog MT7987_TOPRGU_SGMII1_GRST>;
+			mediatek,phya_trx_ck;
 			#clock-cells = <1>;
 
 			sgmiipcs1: pcs {
@@ -231,16 +243,6 @@
 		status = "disabled";
 	};
 
-	pwm_led: pwm-led {
-		 compatible = "pwm-leds";
-		 status = "disabled";
-	 };
-
-	pwm_rgb: pwm-rgb {
-		 compatible = "pwm-leds-multicolor";
-		 status = "disabled";
-	};
-
 	pmu: pmu {
 		compatible = "arm,cortex-a53-pmu";
 		interrupt-parent = <&gic>;
@@ -283,6 +285,12 @@
 					type = "hot";
 				};
 
+				cpu_trip_active_hot: active-hot {
+					temperature = <117000>;
+					hysteresis = <2000>;
+					type = "active";
+				};
+
 				cpu_trip_active_high: active-high {
 					temperature = <115000>;
 					hysteresis = <2000>;
@@ -303,6 +311,15 @@
 			};
 
 			cooling-maps {
+				cpu-active-hot {
+				/* active: dynamic cpu frequency scaling */
+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+							 <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+							 <&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+							 <&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+					trip = <&cpu_trip_active_hot>;
+				};
+
 				cpu-active-high {
 				/* active: set fan to cooling level 2 */
 					cooling-device = <&fan 3 3>;
@@ -364,13 +381,13 @@
 		};
 
 		watchdog: watchdog@1001c000 {
-			compatible = "mediatek,mt7622-wdt",
+			compatible = "mediatek,mt7987-wdt",
+				     "mediatek,mt7988-wdt",
 				     "mediatek,mt6589-wdt",
 				     "syscon";
 			reg = <0 0x1001c000 0 0x1000>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			#reset-cells = <1>;
-			status = "disabled";
 		};
 
 		pio: pinctrl@1001f000 {
@@ -608,7 +625,8 @@
 		};
 
 		afe: audio-controller@11210000 {
-			compatible = "mediatek,mt79xx-audio";
+			compatible = "mediatek,mt7987-afe",
+				     "mediatek,mt7986-afe";
 			reg = <0 0x11210000 0 0x9000>;
 			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&infracfg CLK_INFRA_66M_AUD_SLV_BCK>,
@@ -623,8 +641,8 @@
 				      "aud_l_ck",
 				      "aud_aud_ck",
 				      "aud_eg2_ck",
-				      "aud_sel",
-				      "aud_i2s_m";
+				      "aud_sel", /* Not used in the driver */
+				      "aud_i2s_m"; /* Not used in the driver */
 			assigned-clocks = <&topckgen CLK_TOP_AUD_SEL>,
 					  <&topckgen CLK_TOP_A1SYS_SEL>,
 					  <&topckgen CLK_TOP_AUD_L_SEL>,

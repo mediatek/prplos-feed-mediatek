@@ -196,7 +196,7 @@ ubi_do_upgrade() {
 	local file=$1
 	local dual_boot=$([ -f /sys/firmware/devicetree/base/mediatek,dual-boot ] && echo Y)
 
-	local file_type="$(identify "$file" "" "")"
+	local file_type="$(identify "$file" "cat" "0")"
 
 	case "$file_type" in
 		"fit")

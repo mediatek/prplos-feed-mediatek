@@ -6,19 +6,22 @@
 #
 
 OPTEE_OS_NAME:=optee_os
-OPTEE_OS_RELEASE:=4.5.0
+OPTEE_OS_RELEASE:=4.7.0
 OPTEE_OS_SOURCE=$(OPTEE_OS_NAME)-$(OPTEE_OS_RELEASE).tar.gz
 
 define Download/optee-os
   FILE:=$(OPTEE_OS_SOURCE)
   URL:=https://github.com/OP-TEE/optee_os/archive/refs/tags
   URL_FILE:=$(OPTEE_OS_RELEASE).tar.gz
-  HASH:=43c389f0505e8bc21d6fbaa8ea83ec67d1746ed14a537e3f505cd0e5b4cc2db9
+  HASH:=976b9c184678516038d4e79766608e81d10bf136f76fd0db2dc48f90f994fbd9
 endef
 
 TARGET_PLATFORM=$(call qstrip,$(CONFIG_TARGET_SUBTARGET))
-ifeq ($(TARGET_PLATFORM), filogic)
-	TARGET_PLATFORM=mt7988
+ifeq ($(TARGET_PLATFORM),filogic)
+DEVICE_PROFILE:=CONFIG_TARGET_$(if $(CONFIG_TARGET_MULTI_PROFILE),DEVICE_)$(BOARD)_$(SUBTARGET)_DEVICE_$(BOARD)
+TARGET_DEVICES:=$(shell grep -E '^$(DEVICE_PROFILE)_[^=]+=y' $(TOPDIR)/.config | \
+			sed -E 's/^$(DEVICE_PROFILE)_([^=]+)=.*/\1/' | sed -E 's/(mt798[0-9]+).*/\1/')
+TARGET_PLATFORM:=$(word 1,$(TARGET_DEVICES))
 endif
 
 include optee-os-config.mk
@@ -32,6 +35,7 @@ define Build/Compile/optee-os
 		PLATFORM=mediatek-$(TARGET_PLATFORM) \
 		$(OPTEE_OS_MAKE_FLAGS) \
 		$(OPTEE_MTK_MAKE_FLAGS) \
+		$(OPTEE_TA_SIGN_KEYS) \
 		$(if $(1), EARLY_TA_PATHS="$$$$(cat $(EARLY_TA_LIST))",) \
 		all
 endef
