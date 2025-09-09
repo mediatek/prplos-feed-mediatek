@@ -139,6 +139,9 @@ if test -d "${prplos_root}/../dl"; then
 	fi
 fi
 
+echo -e "\033[1;32m === Build Extra firmware... ===\033[0m"
+make V=s -j$(($(nproc) + 1)) package/feeds/feed_mediatek/linux-firmware/{clean,prepare}
+
 # Execute the make command using 32 threads
 echo -e "\033[1;32m === Executing make command... ===\033[0m"
 make -j32 V=s
