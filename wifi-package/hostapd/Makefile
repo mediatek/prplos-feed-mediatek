@@ -9,9 +9,9 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_URL:=https://w1.fi/hostap.git
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2025-02-09
-PKG_SOURCE_VERSION:=c8c7d56a3d3c4ca79bcbb6a87f372ce4bc2e9f11
-PKG_MIRROR_HASH:=fafdef456a545bd1de0cbd7b68b520e5be7e70ad1aab7ef051b1fc5ccaaa012a
+PKG_SOURCE_DATE:=2025-05-23
+PKG_SOURCE_VERSION:=4b8ac10cb77c3d4dbf7ccefbe697dc0578da374c
+PKG_MIRROR_HASH:=25a77ae4b26adef9c0d71c3b175445f246a4530e63563e81b8e19c2436934100
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 PKG_LICENSE:=BSD-3-Clause
@@ -577,8 +577,7 @@ define Package/afcd/Default
   CATEGORY:=Network
   SUBMENU:=WirelessAPD
   TITLE:=AFC daemon for hostapd
-  DEPENDS:=$(DRV_DEPENDS) +hostapd $(CORE_DEPENDS)
-  EXTRA_DEPENDS:=hostapd (=$(PKG_VERSION)-r$(PKG_RELEASE))
+  DEPENDS:=$(DRV_DEPENDS) $(CORE_DEPENDS) $(OPENSSL_DEPENDS)
   USERID:=network=101:network=101
   URL:=https://github.com/LorenzoBianconi/hostapd/tree/hostap-afc-test-allen
   PROVIDES:=afcd
@@ -629,7 +628,7 @@ ifdef CONFIG_WPA_ENABLE_WEP
 endif
 
 define Build/RunMake
-	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" \
+	CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -Werror" \
 	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR)/$(1) \
 		$(TARGET_CONFIGURE_OPTS) \
 		$(DRIVER_MAKEOPTS) \
@@ -772,7 +771,6 @@ define Package/hostapd/install
 	$(call Install/hostapd,$(1))
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hostapd/hostapd $(1)/usr/sbin/
 endef
-
 Package/hostapd-basic/install = $(Package/hostapd/install)
 Package/hostapd-basic-openssl/install = $(Package/hostapd/install)
 Package/hostapd-basic-wolfssl/install = $(Package/hostapd/install)

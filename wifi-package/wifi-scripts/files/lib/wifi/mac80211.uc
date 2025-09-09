@@ -120,6 +120,7 @@ for (let phy_name, phy in board.wlan) {
 		let mbo = 0;
 		let ssid = "";
 		let ssid_bh = "";
+		let assocresp_elements="dd07000ce700000000";
 
 		if (band_name == "6g") {
 			encryption = "sae";
@@ -160,6 +161,7 @@ set ${si}.ssid='${defaults?.ssid || ssid}'
 set ${si}.encryption='${defaults?.encryption || encryption}'
 set ${si}.key='${defaults?.key || ""}'
 set ${si}.mbo=${mbo}
+set ${si}.assocresp_elements='${assocresp_elements}'
 `);
 
 		if (mbssid)

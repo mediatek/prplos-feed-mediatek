@@ -1,7 +1,7 @@
-From 6e9e30bee27518e7ae4bd8bdd67a8d58e26a34a5 Mon Sep 17 00:00:00 2001
+From e60ab47bbc49172197e35409e84498c235833fb9 Mon Sep 17 00:00:00 2001
 From: Peter Chiu <chui-hao.chiu@mediatek.com>
 Date: Tue, 16 Jan 2024 16:22:17 +0800
-Subject: [PATCH 066/210] mtk: hostapd: add wds mlo support
+Subject: [PATCH 066/236] mtk: hostapd: add wds mlo support
 
 1. Add mld_assoc_sta to get the primary sta_info.
 2. Find hapd according to mld address.
@@ -33,10 +33,10 @@ Signed-off-by: Peter Chiu <chui-hao.chiu@mediatek.com>
  7 files changed, 36 insertions(+), 5 deletions(-)
 
 diff --git a/src/ap/drv_callbacks.c b/src/ap/drv_callbacks.c
-index c7d4fe00f..83e903c79 100644
+index f81b4ed02..cad156e13 100644
 --- a/src/ap/drv_callbacks.c
 +++ b/src/ap/drv_callbacks.c
-@@ -1877,6 +1877,7 @@ switch_link_scan(struct hostapd_data *hapd, u64 scan_cookie)
+@@ -1905,6 +1905,7 @@ switch_link_scan(struct hostapd_data *hapd, u64 scan_cookie)
  static struct hostapd_data * get_hapd_bssid(struct hostapd_iface *iface,
  					    const u8 *bssid, int link_id)
  {
@@ -44,7 +44,7 @@ index c7d4fe00f..83e903c79 100644
  	size_t i;
  
  	if (bssid == NULL)
-@@ -1904,7 +1905,7 @@ static struct hostapd_data * get_hapd_bssid(struct hostapd_iface *iface,
+@@ -1932,7 +1933,7 @@ static struct hostapd_data * get_hapd_bssid(struct hostapd_iface *iface,
  		if (ether_addr_equal(bssid, hapd->own_addr) ||
  		    (hapd->conf->mld_ap &&
  		     ether_addr_equal(bssid, hapd->mld->mld_addr) &&
@@ -53,7 +53,7 @@ index c7d4fe00f..83e903c79 100644
  			return hapd;
  
  		if (!hapd->conf->mld_ap)
-@@ -1916,13 +1917,13 @@ static struct hostapd_data * get_hapd_bssid(struct hostapd_iface *iface,
+@@ -1944,13 +1945,13 @@ static struct hostapd_data * get_hapd_bssid(struct hostapd_iface *iface,
  
  			if (ether_addr_equal(bssid, p_hapd->own_addr) ||
  			    (ether_addr_equal(bssid, p_hapd->mld->mld_addr) &&
@@ -70,10 +70,10 @@ index c7d4fe00f..83e903c79 100644
  
  
 diff --git a/src/ap/ieee802_11.c b/src/ap/ieee802_11.c
-index 8bfba3262..d02561fc8 100644
+index 06e122f9f..e4e297c61 100644
 --- a/src/ap/ieee802_11.c
 +++ b/src/ap/ieee802_11.c
-@@ -3211,6 +3211,7 @@ static void handle_auth(struct hostapd_data *hapd,
+@@ -3444,6 +3444,7 @@ static void handle_auth(struct hostapd_data *hapd,
  
  			ap_sta_set_mld(sta, true);
  			sta->mld_assoc_link_id = link_id;
@@ -81,15 +81,15 @@ index 8bfba3262..d02561fc8 100644
  
  			/*
  			 * Set the MLD address as the station address and the
-@@ -4671,6 +4672,7 @@ static int ieee80211_ml_process_link(struct hostapd_data *hapd,
- 
+@@ -4904,6 +4905,7 @@ int ieee80211_ml_process_link(struct hostapd_data *hapd,
  	sta->flags |= origin_sta->flags | WLAN_STA_ASSOC_REQ_OK;
  	sta->mld_assoc_link_id = origin_sta->mld_assoc_link_id;
+ 	ap_sta_set_mld(sta, true);
 +	sta->mld_assoc_sta = origin_sta;
  
- 	status = __check_assoc_ies(hapd, sta, NULL, 0, &elems, reassoc, true);
+ 	status = __check_assoc_ies(hapd, sta, NULL, 0, &elems, type, true);
  	if (status != WLAN_STATUS_SUCCESS) {
-@@ -7205,6 +7207,12 @@ void ieee802_11_rx_from_unknown(struct hostapd_data *hapd, const u8 *src,
+@@ -7438,6 +7440,12 @@ void ieee802_11_rx_from_unknown(struct hostapd_data *hapd, const u8 *src,
  	struct sta_info *sta;
  
  	sta = ap_get_sta(hapd, src);
@@ -103,7 +103,7 @@ index 8bfba3262..d02561fc8 100644
  	    ((sta->flags & WLAN_STA_ASSOC) ||
  	     ((sta->flags & WLAN_STA_ASSOC_REQ_OK) && wds))) {
 diff --git a/src/ap/sta_info.c b/src/ap/sta_info.c
-index ddd6a6032..438951155 100644
+index dc701ffa0..a15210154 100644
 --- a/src/ap/sta_info.c
 +++ b/src/ap/sta_info.c
 @@ -74,6 +74,7 @@ struct sta_info * ap_get_sta(struct hostapd_data *hapd, const u8 *sta)
@@ -130,22 +130,22 @@ index ddd6a6032..438951155 100644
  	return s;
  }
 diff --git a/src/ap/sta_info.h b/src/ap/sta_info.h
-index fdb30801b..101a67a43 100644
+index 0f3efca60..b78c3415c 100644
 --- a/src/ap/sta_info.h
 +++ b/src/ap/sta_info.h
-@@ -320,6 +320,7 @@ struct sta_info {
- #ifdef CONFIG_IEEE80211BE
+@@ -318,6 +318,7 @@ struct sta_info {
  	struct mld_info mld_info;
  	u8 mld_assoc_link_id;
+ 	struct link_reconf_req_list *reconf_req;
 +	struct sta_info *mld_assoc_sta;
  #endif /* CONFIG_IEEE80211BE */
  
  	u16 max_idle_period; /* if nonzero, the granted BSS max idle period in
 diff --git a/src/drivers/driver.h b/src/drivers/driver.h
-index 748437cd3..9d5cbb135 100644
+index 994f5758f..b8754473e 100644
 --- a/src/drivers/driver.h
 +++ b/src/drivers/driver.h
-@@ -5585,6 +5585,9 @@ struct wpa_driver_ops {
+@@ -5645,6 +5645,9 @@ struct wpa_driver_ops {
  	 * @pp_mode: Value is defined in enum pp_mode
  	 */
  	int (*pp_mode_set)(void *priv, const u8 pp_mode);
@@ -156,10 +156,10 @@ index 748437cd3..9d5cbb135 100644
  
  /**
 diff --git a/src/drivers/driver_nl80211.c b/src/drivers/driver_nl80211.c
-index 203dbd31e..a5306edcc 100644
+index 994aee3fb..2e6818d14 100644
 --- a/src/drivers/driver_nl80211.c
 +++ b/src/drivers/driver_nl80211.c
-@@ -15906,6 +15906,17 @@ fail:
+@@ -16113,6 +16113,17 @@ fail:
  	return -ENOBUFS;
  }
  
@@ -177,7 +177,7 @@ index 203dbd31e..a5306edcc 100644
  const struct wpa_driver_ops wpa_driver_nl80211_ops = {
  	.name = "nl80211",
  	.desc = "Linux nl80211/cfg80211",
-@@ -16098,4 +16109,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
+@@ -16306,4 +16317,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
  	.amnt_dump = nl80211_amnt_dump,
  	.background_radar_mode = nl80211_background_radar_mode,
  	.pp_mode_set = nl80211_pp_mode_set,
@@ -186,10 +186,10 @@ index 203dbd31e..a5306edcc 100644
 +#endif
  };
 diff --git a/src/drivers/driver_nl80211_event.c b/src/drivers/driver_nl80211_event.c
-index 6507f1349..c82c9a138 100644
+index 395807c4f..e43f04459 100644
 --- a/src/drivers/driver_nl80211_event.c
 +++ b/src/drivers/driver_nl80211_event.c
-@@ -2689,7 +2689,7 @@ static void nl80211_spurious_frame(struct i802_bss *bss, struct nlattr **tb,
+@@ -2807,7 +2807,7 @@ static void nl80211_spurious_frame(struct i802_bss *bss, struct nlattr **tb,
  	event.rx_from_unknown.addr = nla_data(tb[NL80211_ATTR_MAC]);
  	event.rx_from_unknown.wds = wds;
  

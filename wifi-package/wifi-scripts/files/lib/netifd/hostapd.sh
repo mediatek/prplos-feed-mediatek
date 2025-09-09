@@ -80,12 +80,15 @@ hostapd_append_wpa_key_mgmt() {
 			append wpa_key_mgmt "SAE"
 			[ "${ieee80211r:-0}" -gt 0 ] && append wpa_key_mgmt "FT-SAE"
 		;;
+		psk-sae-ext)
+			append wpa_key_mgmt "WPA-PSK SAE SAE-EXT-KEY"
+		;;
 		owe)
 			append wpa_key_mgmt "OWE"
 		;;
 	esac
 
-	[ "$fils" -gt 0 ] && {
+	[ -n "$fils" ] && [ "$fils" -gt 0 ] && {
 		case "$auth_type" in
 			eap192)
 				append wpa_key_mgmt FILS-SHA384
@@ -200,7 +203,7 @@ hostapd_prepare_device_config() {
 			[ -n "$local_pwr_constraint" ] && append base_cfg "local_pwr_constraint=$local_pwr_constraint" "$N"
 			[ "$spectrum_mgmt_required" -gt 0 ] && append base_cfg "spectrum_mgmt_required=$spectrum_mgmt_required" "$N"
 		}
-		[ "$hwmode" = "a" -a "$doth" -gt 0 ] && append base_cfg "ieee80211h=1" "$N"
+		[ "$hwmode" = "a" -a "$doth" -gt 0 ] && [ "$band" = "5g" ] && append base_cfg "ieee80211h=1" "$N"
 	}
 
 	[ -n "$acs_chan_bias" ] && append base_cfg "acs_chan_bias=$acs_chan_bias" "$N"
@@ -368,6 +371,7 @@ hostapd_common_add_bss_config() {
 	config_add_int time_advertisement
 	config_add_string time_zone
 	config_add_string vendor_elements
+	config_add_string assocresp_elements
 
 	config_add_boolean ieee80211k rrm_neighbor_report rrm_beacon_report
 
@@ -462,6 +466,8 @@ hostapd_common_add_bss_config() {
 	config_add_string mld_addr
 	config_add_int eml_disable
 	config_add_int eml_resp
+	config_add_string mtk_vendor_element
+	config_add_int disable_rrm
 }
 
 hostapd_set_vlan_file() {
@@ -495,7 +501,7 @@ hostapd_set_psk() {
 
 	rm -f /var/run/hostapd-${ifname}.psk
 	case "$auth_type" in
-		psk|psk-sae) ;;
+		psk|psk-sae|psk-sae-ext) ;;
 		*) return ;;
 	esac
 	for_each_station hostapd_set_psk_file ${ifname}
@@ -518,7 +524,7 @@ hostapd_set_sae() {
 
 	rm -f /var/run/hostapd-${ifname}.sae
 	case "$auth_type" in
-		sae|psk-sae) ;;
+		sae|psk-sae|psk-sae-ext) ;;
 		*) return ;;
 	esac
 	for_each_station hostapd_set_sae_file ${ifname}
@@ -678,7 +684,8 @@ hostapd_set_bss_options() {
 		eap_server eap_user_file ca_cert server_cert private_key private_key_passwd server_id radius_server_clients radius_server_auth_port \
 		vendor_elements fils ocv apup unsol_bcast_probe_resp_interval fils_discovery_min_interval \
 		fils_discovery_max_interval rnr group_cipher group_mgmt_cipher \
-		mld_id mld_link_id mld_primary mld_addr mld_allowed_links mld_radio_mask eml_disable eml_resp
+		mld_id mld_link_id mld_primary mld_addr mld_allowed_links mld_radio_mask eml_disable eml_resp \
+		assocresp_elements
 
 	set_default fils 0
 	set_default isolate 0
@@ -703,6 +710,7 @@ hostapd_set_bss_options() {
 	set_default airtime_bss_limit 0
 	set_default eap_server 0
 	set_default apup 0
+	set_default unsol_bcast_probe_resp_interval 0
 
 	/usr/sbin/hostapd -vfils || fils=0
 
@@ -732,6 +740,7 @@ hostapd_set_bss_options() {
 	append bss_conf "utf8_ssid=$utf8_ssid" "$N"
 	append bss_conf "multi_ap=$multi_ap" "$N"
 	[ -n "$vendor_elements" ] && append bss_conf "vendor_elements=$vendor_elements" "$N"
+	[ -n "$assocresp_elements" ] && append bss_conf "assocresp_elements=$assocresp_elements" "$N"
 
 	[ "$tdls_prohibit" -gt 0 ] && append bss_conf "tdls_prohibit=$tdls_prohibit" "$N"
 
@@ -757,7 +766,7 @@ hostapd_set_bss_options() {
 			set_default sae_require_mfp 1
 			[ "$ppsk" -eq 0 ] && set_default sae_pwe 2
 		;;
-		psk-sae|eap-eap2)
+		psk-sae|psk-sae-ext|eap-eap2)
 			set_default ieee80211w 1
 			set_default sae_require_mfp 1
 			[ "$ppsk" -eq 0 ] && set_default sae_pwe 2
@@ -780,7 +789,7 @@ hostapd_set_bss_options() {
 			# with WPS enabled, we got to be in unconfigured state.
 			wps_not_configured=1
 		;;
-		psk|sae|psk-sae)
+		psk|sae|psk-sae|psk-sae-ext)
 			json_get_vars key wpa_psk_file sae_password_file
 			if [ "$ppsk" -ne 0 ]; then
 				json_get_vars auth_secret auth_port
@@ -800,12 +809,12 @@ hostapd_set_bss_options() {
 				return 1
 			fi
 			[ -z "$wpa_psk_file" ] && set_default wpa_psk_file /var/run/hostapd-$ifname.psk
-			[ -n "$wpa_psk_file" ] && [ "$auth_type" = "psk" -o "$auth_type" = "psk-sae" ] && {
+			[ -n "$wpa_psk_file" ] && [ "$auth_type" = "psk" -o "$auth_type" = "psk-sae" -o "$auth_type" = "psk-sae-ext" ] && {
 				[ -e "$wpa_psk_file" ] || touch "$wpa_psk_file"
 				append bss_conf "wpa_psk_file=$wpa_psk_file" "$N"
 			}
 			[ -z "$sae_password_file" ] && set_default sae_password_file /var/run/hostapd-$ifname.sae
-			[ -n "$sae_password_file" ] && [ "$auth_type" = "sae" -o "$auth_type" = "psk-sae" ] && {
+			[ -n "$sae_password_file" ] && [ "$auth_type" = "sae" -o "$auth_type" = "psk-sae" -o "$auth_type" = "psk-sae-ext" ] && {
 				[ -e "$sae_password_file" ] || touch "$sae_password_file"
 				append bss_conf "sae_password_file=$sae_password_file" "$N"
 			}
@@ -894,7 +903,7 @@ hostapd_set_bss_options() {
 	esac
 
 	case "$auth_type" in
-		none|owe|psk|sae|psk-sae|wep)
+		none|owe|psk|sae|psk-sae|psk-sae-ext|wep)
 			json_get_vars \
 			auth_server auth_port auth_secret \
 			ownip radius_client_addr
@@ -1138,7 +1147,7 @@ hostapd_set_bss_options() {
 			append bss_conf "rsn_preauth_interfaces=$network_bridge" "$N"
 		else
 			case "$auth_type" in
-			sae|psk-sae|owe)
+			sae|psk-sae|psk-sae-ext|owe)
 				set_default auth_cache 1
 			;;
 			*)
@@ -1156,7 +1165,7 @@ hostapd_set_bss_options() {
 
 		[ -z "$group_cipher" ] && group_cipher="$wpa_cipher"
 		if [ -n "$group_cipher" ]; then
-			if [ "$group_cipher" == "CCMP TKIP" ]; then
+			if [ "$group_cipher" == "CCMP TKIP" ] || [ "$group_cipher" == "CCMP GCMP-256" ]; then
 				append bss_conf "group_cipher=CCMP" "$N"
 			else
 				append bss_conf "group_cipher=$group_cipher" "$N"
@@ -1422,17 +1431,17 @@ hostapd_set_bss_options() {
 		fi
 	fi
 
-	if [ "$mld_primary" -gt 0 ]; then
+	if [ -n "$mld_primary" ] && [ "$mld_primary" -gt 0 ]; then
 		append bss_conf "#mld_primary=${mld_primary}" "$N"
 	fi
 
 	[ -n "$mld_link_id" ] && append bss_conf "mld_link_id=${mld_link_id}" "$N"
 
-	if [ "$mld_allowed_links" -gt 0 ]; then
+	if [ -n "$mld_allowed_links" ] && [ "$mld_allowed_links" -gt 0 ]; then
 		append bss_conf "mld_allowed_links=${mld_allowed_links}" "$N"
 	fi
 
-	if [ "$mld_radio_mask" -gt 0 ]; then
+	if [ -n "$mld_radio_mask" ] && [ "$mld_radio_mask" -gt 0 ]; then
 		append bss_conf "#mld_radio_mask=${mld_radio_mask}" "$N"
 	fi
 
@@ -1500,6 +1509,7 @@ wpa_supplicant_prepare_interface() {
 	_wpa_supplicant_common "$1"
 
 	json_get_vars mode wds multi_ap assoc_phy mld_single_link mld_assoc_phy mld_allowed_phy_bitmap rsn_overriding
+	json_get_vars disable_rrm
 	set_default mld_allowed_phy_bitmap 0
 	set_default rsn_overriding 2
 
@@ -1544,7 +1554,7 @@ wpa_supplicant_prepare_interface() {
 	}
 
 	if !([ "$mld_allowed_phy_bitmap" -ge 0 ] && [ "$mld_allowed_phy_bitmap" -le 7 ]); then
-		echo "Error: Invalid MLD allowed phy: ${mld_allowed_phy_bitmap}"
+		echo "error: Invalid MLD allowed phy: ${mld_allowed_phy_bitmap}"
 		return 1
 	fi
 
@@ -1553,7 +1563,12 @@ wpa_supplicant_prepare_interface() {
 	local mld_connect_band_pref=
 	if [ -n "$mld_assoc_phy" ]; then
 		if [ $(($mld_allowed_phy_bitmap & $((1<<$mld_assoc_phy)))) -eq 0 ]; then
-			echo "Error: Conflict between preferred association phy and allowed phy"
+			echo "error: Conflict between preferred association phy and allowed phy"
+			return 1
+		fi
+
+		if [ $(($mld_allowed_phy_bitmap & $((1<<$radio)))) -eq 0 ]; then
+			echo "error: Conflict between UCI setup phy and allowed phy"
 			return 1
 		fi
 
@@ -1601,6 +1616,7 @@ ${mld_force_single_link:+mld_force_single_link=$mld_force_single_link}
 ${mld_allowed_phy_bitmap:+mld_allowed_phy=$mld_allowed_phy_bitmap}
 $rsn_overriding_str
 wps_cred_add_sae=1
+${disable_rrm:+disable_rrm=$disable_rrm}
 EOF
 	return 0
 }
@@ -1641,7 +1657,8 @@ wpa_supplicant_add_network() {
 		basic_rate mcast_rate \
 		ieee80211w ieee80211r fils ocv \
 		multi_ap \
-		default_disabled
+		default_disabled \
+		mtk_vendor_element
 
 	case "$auth_type" in
 		sae|owe|eap2|eap192)
@@ -1692,6 +1709,7 @@ wpa_supplicant_add_network() {
 	}
 
 	[ -n "$ocv" ] && append network_data "ocv=$ocv" "$N$T"
+	[ -n "$mtk_vendor_element" ] && append network_data "mtk_vendor_element=\"$mtk_vendor_element\"" "$N$T"
 
 	case "$auth_type" in
 		none) ;;
@@ -1707,7 +1725,7 @@ wpa_supplicant_add_network() {
 		wps)
 			key_mgmt='WPS'
 		;;
-		psk|sae|psk-sae)
+		psk|sae|psk-sae|psk-sae-ext)
 			local passphrase
 
 			if [ "$_w_mode" != "mesh" ]; then

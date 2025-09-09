@@ -1,7 +1,7 @@
-From 438b1af0f8ef68030302c61280acd3d47e9691a3 Mon Sep 17 00:00:00 2001
+From 5a922044b09d8087d5b0813d10de297427dcc76e Mon Sep 17 00:00:00 2001
 From: Michael-CY Lee <michael-cy.lee@mediatek.com>
 Date: Fri, 1 Mar 2024 16:59:53 +0800
-Subject: [PATCH 067/210] mtk: hostapd: prevent getting non-MLD STA for other
+Subject: [PATCH 067/236] mtk: hostapd: prevent getting non-MLD STA for other
  links
 
 Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
@@ -10,7 +10,7 @@ Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/src/ap/sta_info.c b/src/ap/sta_info.c
-index 438951155..d7e88a597 100644
+index a15210154..e8712fcad 100644
 --- a/src/ap/sta_info.c
 +++ b/src/ap/sta_info.c
 @@ -87,7 +87,8 @@ struct sta_info * ap_get_sta(struct hostapd_data *hapd, const u8 *sta)

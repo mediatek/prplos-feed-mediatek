@@ -1,7 +1,7 @@
-From 137f96b7ea9984d9c168c4281b3489ab74a6ae1c Mon Sep 17 00:00:00 2001
+From 3fa3316f63350f28d4e45f23184d3327f378eb45 Mon Sep 17 00:00:00 2001
 From: Michael-CY Lee <michael-cy.lee@mediatek.com>
 Date: Thu, 14 Mar 2024 14:31:28 +0800
-Subject: [PATCH 069/210] mtk: hostapd: using MLD addr as SA/BSSID for
+Subject: [PATCH 069/236] mtk: hostapd: using MLD addr as SA/BSSID for
  broadcast DEAUTH
 
 Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
@@ -10,10 +10,10 @@ Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/ap/ap_drv_ops.c b/src/ap/ap_drv_ops.c
-index b10791ef8..e9edbfd2b 100644
+index f11497134..ea7cf6ae6 100644
 --- a/src/ap/ap_drv_ops.c
 +++ b/src/ap/ap_drv_ops.c
-@@ -915,7 +915,7 @@ int hostapd_drv_sta_deauth(struct hostapd_data *hapd,
+@@ -936,7 +936,7 @@ int hostapd_drv_sta_deauth(struct hostapd_data *hapd,
  		else
  			link_id = hapd->mld_link_id;
  
@@ -22,15 +22,15 @@ index b10791ef8..e9edbfd2b 100644
  			own_addr = hapd->mld->mld_addr;
  	}
  #endif /* CONFIG_IEEE80211BE */
-@@ -936,7 +936,7 @@ int hostapd_drv_sta_disassoc(struct hostapd_data *hapd,
+@@ -958,7 +958,7 @@ int hostapd_drv_sta_disassoc(struct hostapd_data *hapd,
  	if (hapd->conf->mld_ap) {
  		struct sta_info *sta = ap_get_sta(hapd, addr);
  
--		if (ap_sta_is_mld(hapd, sta))
-+		if (ap_sta_is_mld(hapd, sta) || is_multicast_ether_addr(addr))
+-		if (ap_sta_is_mld(hapd, sta)) {
++		if (ap_sta_is_mld(hapd, sta) || is_multicast_ether_addr(addr)) {
  			own_addr = hapd->mld->mld_addr;
- 	}
- #endif /* CONFIG_IEEE80211BE */
+ 			link_id = hapd->mld_link_id;
+ 		}
 -- 
 2.45.2
 

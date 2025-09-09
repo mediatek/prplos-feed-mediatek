@@ -219,18 +219,21 @@ function __iface_pending_next(pending, state, ret, data)
 		if (!iface_add(phy, config))
 			hostapd.printf(`hostapd.add_iface failed for phy ${phy} ifname=${bss.ifname}`);
 		let iface = hostapd.interfaces[phy];
-		if (!bss.mld_ap) {
-			pending.call("wpa_supplicant", "phy_set_state", {
-				phy: phydev.phy,
-				radio: phydev.radio ?? -1,
-				stop: false
-			});
-		} else if (!iface || iface.is_mld_finished()) {
-			pending.call("wpa_supplicant", "phy_set_state", {
-				phy: "phy0",
-				radio: 0,
-				stop: false
-			});
+		if (!iface || iface.get_finished_radio_mask() == config.used_radio_mask) {
+			let radio_idx = 0, radio_mask = iface.get_radio_mask();
+
+			while (radio_mask) {
+				if (radio_mask & 1) {
+					pending.call("wpa_supplicant", "phy_set_state", {
+						phy: "phy0",
+						radio: radio_idx,
+						stop: false
+					});
+				}
+
+				radio_idx++;
+				radio_mask >>= 1;
+			}
 		}
 		return null;
 	case "done":
@@ -771,6 +774,9 @@ function iface_load_config(phy, radio, filename)
 		    val[0] == "mbssid")
 			config[substr(val[0], 1)] = int(val[1]);
 
+		if (val[0] == "#used_radio_mask")
+			config["used_radio_mask"] = int(val[1]);
+
 		push(config.radio.data, line);
 	}
 
@@ -822,6 +828,10 @@ function iface_load_config(phy, radio, filename)
 		let tmp_bss = config.bss[0];
 		config.bss[0] = config.bss[first_mld_bss];
 		config.bss[first_mld_bss] = tmp_bss;
+
+		let tmp_bssid = config.bss[0].bssid;
+		config.bss[0].bssid = config.bss[first_mld_bss].bssid;
+		config.bss[first_mld_bss].bssid = tmp_bssid;
 		hostapd.printf(`mtk: ucode: switch bss[${first_mld_bss}] to first`);
 	}
 
@@ -888,7 +898,6 @@ let main_obj = {
 			sec_chan_offset: 0,
 			ch_width: -1,
 			bw320_offset: 1,
-			radio_idx: 0,
 			csa: true,
 			csa_count: 0,
 			punct_bitmap: 0,
@@ -905,7 +914,6 @@ let main_obj = {
 			hostapd.printf(`    * sec_chan_offset: ${req.args.sec_chan_offset}`);
 			hostapd.printf(`    * ch_width: ${req.args.ch_width}`);
 			hostapd.printf(`    * bw320_offset: ${req.args.bw320_offset}`);
-			hostapd.printf(`    * radio_idx: ${req.args.radio_idx}`);
 			hostapd.printf(`    * csa: ${req.args.csa}`);
 			hostapd.printf(`    * punct_bitmap: ${req.args.punct_bitmap}`);
 
@@ -922,12 +930,7 @@ let main_obj = {
 				return 0;
 			}
 
-			if (!req.args.frequency)
-				return libubus.STATUS_INVALID_ARGUMENT;
-
 			let freq_info = iface_freq_info(iface, config, req.args);
-			if (!freq_info)
-				return libubus.STATUS_UNKNOWN_ERROR;
 
 			let ret;
 			if (req.args.csa) {
