@@ -1,12 +1,12 @@
 diff --git a/profiles/mtk_filogic.yml b/profiles/mtk_filogic.yml
-index 36b0b01..0f9528d 100644
+index 36b0b01..25a9bc2 100644
 --- a/profiles/mtk_filogic.yml
 +++ b/profiles/mtk_filogic.yml
-@@ -1,14 +1,67 @@
+@@ -1,14 +1,73 @@
  ---
  profiles:
--  - arcadyan_mozart
-+  - arcadyan-mozart
+   - arcadyan_mozart
++  - mediatek_mt7987a-rfb
 +  - mediatek_mt7988a-rfb
 +  - mediatek_mt7988d-rfb
  target: mediatek
@@ -18,7 +18,7 @@ index 36b0b01..0f9528d 100644
 -    uri: https://gitlab.com/prpl-foundation/prplos/feeds/feed-mediatek
 -    revision: main@a7f3d2f04ecc36e397ae15cb7c2d70821215a713
 +    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
-+    tracking_branch: master
++    tracking_branch: prplos-4.1
 +    revision: # <need to replace with commit hash>
 +
 +additional_packages:
@@ -34,6 +34,9 @@ index 36b0b01..0f9528d 100644
  
  packages:
    - mediatek
++  - kmod-mt7990-firmware
++  - kmod-mt7992-firmware
++  - kmod-mt7992-23-firmware
 +  - kmod-mt7996-firmware
 +  - kmod-mt7996-233-firmware
 +  - kmod-mt7996e
@@ -68,6 +71,8 @@ index 36b0b01..0f9528d 100644
 +  - netfilter-flowtable
 +  - afcd
 +  - atenl
++  - nftables-json
++  - libnftnl
 +
 +diffconfig: |
 +  CONFIG_PACKAGE_CFG80211_TESTMODE=y
