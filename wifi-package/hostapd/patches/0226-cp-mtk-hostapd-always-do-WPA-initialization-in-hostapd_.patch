@@ -1,7 +1,7 @@
-From ba8a16174180ed1afd5bcbfba20d4dfbed5ecfa8 Mon Sep 17 00:00:00 2001
+From db2caf0928ca23e175f2d07dfa51f33c7e443214 Mon Sep 17 00:00:00 2001
 From: Michael-CY Lee <michael-cy.lee@mediatek.com>
 Date: Tue, 5 Aug 2025 10:20:17 +0800
-Subject: [PATCH 226/226] mtk: hostapd: always do WPA initialization in
+Subject: [PATCH] mtk: hostapd: always do WPA initialization in
  hostapd_reload_bss() if hapd->conf->wpa is set
 
 Compared to the WPA initialization flow, a lot of content is missing
@@ -14,18 +14,28 @@ flow whenever hapd->conf->wpa is set.
 
 Signed-off-by: Michael-CY Lee <michael-cy.lee@mediatek.com>
 ---
- src/ap/hostapd.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ src/ap/hostapd.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
 diff --git a/src/ap/hostapd.c b/src/ap/hostapd.c
-index 7d8e7f7d0..a21513e04 100644
+index 7d8e7f7d0..3dbfe2489 100644
 --- a/src/ap/hostapd.c
 +++ b/src/ap/hostapd.c
-@@ -163,10 +163,14 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
+@@ -163,10 +163,24 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
  	else
  		hostapd_set_drv_ieee8021x(hapd, hapd->conf->iface, 0);
  
 -	if ((hapd->conf->wpa || hapd->conf->osen) && hapd->wpa_auth == NULL) {
++	if (hapd->wpa_auth) {
++		wpa_deinit(hapd->wpa_auth);
++		hapd->wpa_auth = NULL;
++		hostapd_set_privacy(hapd, 0);
++#ifdef CONFIG_WEP
++		hostapd_setup_encryption(hapd->conf->iface, hapd);
++#endif /* CONFIG_WEP */
++		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
++	}
++
 +	if ((hapd->conf->wpa || hapd->conf->osen)) {
  		hostapd_setup_wpa(hapd);
  		if (hapd->wpa_auth)
@@ -37,14 +47,22 @@ index 7d8e7f7d0..a21513e04 100644
  	} else if (hapd->conf->wpa) {
  		const u8 *wpa_ie;
  		size_t wpa_ie_len;
-@@ -175,6 +179,7 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
+@@ -175,14 +189,7 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
  		if (hostapd_set_generic_elem(hapd, wpa_ie, wpa_ie_len))
  			wpa_printf(MSG_ERROR, "Failed to configure WPA IE for "
  				   "the kernel driver.");
+-	} else if (hapd->wpa_auth) {
+-		wpa_deinit(hapd->wpa_auth);
+-		hapd->wpa_auth = NULL;
+-		hostapd_set_privacy(hapd, 0);
+-#ifdef CONFIG_WEP
+-		hostapd_setup_encryption(hapd->conf->iface, hapd);
+-#endif /* CONFIG_WEP */
+-		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
 +	*/
- 	} else if (hapd->wpa_auth) {
- 		wpa_deinit(hapd->wpa_auth);
- 		hapd->wpa_auth = NULL;
+ 	}
+ 
+ 	hostapd_neighbor_sync_own_report(hapd);
 -- 
 2.45.2
 
