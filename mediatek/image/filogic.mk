@@ -440,7 +440,7 @@ define Device/mediatek_mt7987a-rfb
   DEVICE_MODEL := MT7987A rfb (DT-overlay)
   DEVICE_DTS := mt7987a-rfb
   DEVICE_DTS_OVERLAY:= \
-	mt7987-spim-nand \
+	mt7987-spim-nand-nmbm \
 	mt7987-spidev \
 	mt7987-spim-nor \
 	mt7987-emmc \
@@ -478,7 +478,7 @@ define Device/bananapi_bpi-r4-lite
   DEVICE_MODEL := BPi-R4 Lite
   DEVICE_DTS := mt7987a-bananapi-bpi-r4-lite
   DEVICE_DTS_OVERLAY:= \
-	mt7987-spim-nand \
+	mt7987-spim-nand-nmbm \
 	mt7987-spidev \
 	mt7987-spim-nor \
 	mt7987-emmc \
