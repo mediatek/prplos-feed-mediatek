@@ -1,0 +1,40 @@
+From 3dd57b8789067d841c3175df02481a410a0c32b0 Mon Sep 17 00:00:00 2001
+From: Allen Ye <allen.ye@mediatek.com>
+Date: Thu, 10 Jul 2025 11:38:10 +0800
+Subject: [PATCH 06/10] mtk: mt76: mt7996: prevent kernel crash after cmd
+ timeout
+
+Add protection to prevent crash happened when mcu cmd (CHANNEL_SWITCH) timeout.
+
+Signed-off-by: Allen Ye <allen.ye@mediatek.com>
+---
+ mt7996/mcu.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+index a45e91a9..19d20fec 100644
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -7766,7 +7766,8 @@ int mt7996_mcu_set_pp_en(struct mt7996_phy *phy, u8 mode, u16 bitmap)
+ 		.csa_enable = false,
+ 	};
+ 
+-	if (phy->mt76->chanctx->chandef.chan->band == NL80211_BAND_2GHZ ||
++	if (!phy->mt76->chanctx ||
++	    phy->mt76->chanctx->chandef.chan->band == NL80211_BAND_2GHZ ||
+ 	    mode > PP_USR_MODE)
+ 		return 0;
+ 
+@@ -7819,7 +7820,8 @@ int mt7996_mcu_set_pp_sta_dscb(struct mt7996_phy *phy,
+ 		.ccfs1 = ieee80211_frequency_to_channel(chandef->center_freq1),
+ 	};
+ 
+-	if (phy->mt76->chanctx->chandef.chan->band == NL80211_BAND_2GHZ ||
++	if (!phy->mt76->chanctx ||
++	    phy->mt76->chanctx->chandef.chan->band == NL80211_BAND_2GHZ ||
+ 	    phy->punct_bitmap == chandef->punctured)
+ 		return 0;
+ 
+-- 
+2.45.2
+

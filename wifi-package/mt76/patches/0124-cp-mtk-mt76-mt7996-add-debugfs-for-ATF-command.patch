@@ -1,0 +1,131 @@
+From 30b79ab02ef009a2e0f4169ad7a64000f3d10022 Mon Sep 17 00:00:00 2001
+From: Benjamin Lin <benjamin-jw.lin@mediatek.com>
+Date: Thu, 18 Sep 2025 14:35:54 +0800
+Subject: [PATCH 05/10] mtk: mt76: mt7996: add debugfs for ATF command
+
+Add DebugFS knob "atf_sch_ctrl" to set and get ATF scheduling method.
+
+Signed-off-by: Benjamin Lin <benjamin-jw.lin@mediatek.com>
+---
+ mt7996/debugfs.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++
+ mt7996/mt7996.h  |  6 ++--
+ 2 files changed, 80 insertions(+), 2 deletions(-)
+
+diff --git a/mt7996/debugfs.c b/mt7996/debugfs.c
+index dc94c251..520b0446 100644
+--- a/mt7996/debugfs.c
++++ b/mt7996/debugfs.c
+@@ -1166,6 +1166,81 @@ mt7996_atf_enable_set(void *data, u64 val)
+ DEFINE_DEBUGFS_ATTRIBUTE(fops_atf_enable, mt7996_atf_enable_get,
+ 	                 mt7996_atf_enable_set, "%llu\n");
+ 
++static ssize_t mt7996_atf_sch_ctrl_set(struct file *file,
++				       const char __user *user_buf,
++				       size_t count, loff_t *ppos)
++{
++	struct mt7996_phy *phy = file->private_data;
++	struct mt7996_dev *dev = phy->dev;
++	struct mt7996_vow_ctrl *vow = &dev->vow;
++	u8 type, policy;
++	char buf[100];
++	int ret;
++
++	if (count >= sizeof(buf))
++		return -EINVAL;
++
++	if (copy_from_user(buf, user_buf, count))
++		return -EFAULT;
++
++	if (count && buf[count - 1] == '\n')
++		buf[count - 1] = '\0';
++	else
++		buf[count] = '\0';
++
++	if (sscanf(buf, "%hhu-%hhu", &type, &policy) != 2) {
++		dev_err(dev->mt76.dev, "Format: <type>-<policy>\n");
++		return -EINVAL;
++	}
++
++	if (type >= VOW_SCH_TYPE_NUM || policy >= VOW_SCH_POLICY_NUM) {
++		dev_err(dev->mt76.dev,
++			"Invalid scheduling type %hhu or policy %hhu\n", type, policy);
++		return -EINVAL;
++	}
++
++	vow->sch_type = type;
++	vow->sch_policy = policy;
++
++	ret = mt7996_mcu_set_vow_feature_ctrl(phy);
++	if (ret) {
++		dev_err(dev->mt76.dev, "Fail to set VoW feature control\n");
++		return ret;
++	}
++
++	return count;
++}
++
++static ssize_t mt7996_atf_sch_ctrl_get(struct file *file, char __user *user_buf,
++				       size_t count, loff_t *ppos)
++{
++	struct mt7996_phy *phy = file->private_data;
++	struct mt7996_vow_ctrl *vow = &phy->dev->vow;
++	static const size_t size = 128;
++	int len = 0, ret;
++	char *buf;
++
++	buf = kzalloc(size, GFP_KERNEL);
++	if (!buf)
++		return -ENOMEM;
++
++	len += scnprintf(buf + len, size - len, "ATF Scheduling Info:\n");
++	len += scnprintf(buf + len, size - len, "Type: %hhu\n", vow->sch_type);
++	len += scnprintf(buf + len, size - len, "Policy: %hhu\n", vow->sch_policy);
++
++	ret = simple_read_from_buffer(user_buf, count, ppos, buf, len);
++	kfree(buf);
++	return ret;
++}
++
++static const struct file_operations fops_atf_sch_ctrl = {
++	.write = mt7996_atf_sch_ctrl_set,
++	.read = mt7996_atf_sch_ctrl_get,
++	.open = simple_open,
++	.owner = THIS_MODULE,
++	.llseek = default_llseek,
++};
++
+ static int
+ mt7996_airtime_read(struct seq_file *s, void *data)
+ {
+@@ -1225,6 +1300,7 @@ int mt7996_init_band_debugfs(struct mt7996_phy *phy)
+ 	debugfs_create_file("sys_recovery", 0600, dir, phy,
+ 			    &mt7996_sys_recovery_ops);
+ 	debugfs_create_file("atf_enable", 0600, dir, phy, &fops_atf_enable);
++	debugfs_create_file("atf_sch_ctrl", 0600, dir, phy, &fops_atf_sch_ctrl);
+ 	debugfs_create_file("tx_stats", 0400, dir, phy, &mt7996_tx_stats_fops);
+ 	if (phy->mt76->cap.has_5ghz) {
+ 		debugfs_create_u32("dfs_hw_pattern", 0400, dir,
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+index 2957762f..ea1872ac 100644
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -373,12 +373,14 @@ enum {
+ 
+ enum {
+ 	VOW_SCH_TYPE_FOLLOW_POLICY,
+-	VOW_SCH_TYPE_FOLLOW_HW
++	VOW_SCH_TYPE_FOLLOW_HW,
++	VOW_SCH_TYPE_NUM
+ };
+ 
+ enum {
+ 	VOW_SCH_POLICY_SRR, /* Shared Round-Robin */
+-	VOW_SCH_POLICY_WRR /* Weighted Round-Robin */
++	VOW_SCH_POLICY_WRR, /* Weighted Round-Robin */
++	VOW_SCH_POLICY_NUM
+ };
+ 
+ enum vow_drr_ctrl_id {
+-- 
+2.45.2
+

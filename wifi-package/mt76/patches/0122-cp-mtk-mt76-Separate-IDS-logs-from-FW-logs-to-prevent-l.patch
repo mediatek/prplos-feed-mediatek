@@ -1,0 +1,159 @@
+From 48eb315402bbd2251313809c974fb9778074fb1d Mon Sep 17 00:00:00 2001
+From: Evelyn Tsai <evelyn.tsai@mediatek.com>
+Date: Wed, 17 Sep 2025 17:58:46 +0800
+Subject: [PATCH 03/10] mtk: mt76: Separate IDS logs from FW logs to prevent
+ large log sizes
+
+Previously, when enabling FW log, we would directly enable many debug
+modules; however, this made WM very busy and thus increased the latency
+for some FW functions, e.g., generate TXCMD.
+
+To prevent this, rework the flow of setting FW debug modules.
+Now we only enable those most frequently used modules by default.
+To enable other modules, users should use "fw_debug_module" and
+"fw_debug_level".
+
+For example, to enable IDS_PP log:
+echo 93 > fw_debug_module && echo 1 > fw_debug_level
+The module numbers could be found in code or wiki.
+
+When disabling FW log, we'll also disable all the debug modules, no
+matter those set by default or by users.
+
+Signed-off-by: Shayne Chen <shayne.chen@mediatek.com>
+---
+ mt7996/debugfs.c | 81 +++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 52 insertions(+), 29 deletions(-)
+
+diff --git a/mt7996/debugfs.c b/mt7996/debugfs.c
+index abfe11ec..54018e1c 100644
+--- a/mt7996/debugfs.c
++++ b/mt7996/debugfs.c
+@@ -337,6 +337,8 @@ out:
+ static int
+ mt7996_fw_debug_wm_set(void *data, u64 val)
+ {
++#define IDS(_m)	(is_mt7996(&dev->mt76) ? DEBUG_MT7996_IDS_##_m : \
++					DEBUG_MT7992_IDS_##_m)
+ 	struct mt7996_dev *dev = data;
+ 	enum {
+ 		DEBUG_TXCMD = 62,
+@@ -344,17 +346,30 @@ mt7996_fw_debug_wm_set(void *data, u64 val)
+ 		DEBUG_CMD_RPT_TRIG,
+ 		DEBUG_SPL,
+ 		DEBUG_RPT_RX,
++
+ 		DEBUG_IDS_SND = 84,
+ 		DEBUG_IDS_BSRP,
+ 		DEBUG_IDS_TPUT_MON,
+-		DEBUG_IDS_PP = 93,
+-		DEBUG_IDS_RA,
+-		DEBUG_IDS_BF,
+-		DEBUG_IDS_SR,
+-		DEBUG_IDS_RU,
+-		DEBUG_IDS_MUMIMO,
+-		DEBUG_IDS_MLO = 100,
+-		DEBUG_IDS_ERR_LOG,
++
++		/* IDS log for mt7996 */
++		DEBUG_MT7996_IDS_PP = 93,
++		DEBUG_MT7996_IDS_RA,
++		DEBUG_MT7996_IDS_BF,
++		DEBUG_MT7996_IDS_SR,
++		DEBUG_MT7996_IDS_RU,
++		DEBUG_MT7996_IDS_MUMIMO,
++		DEBUG_MT7996_IDS_MLO = 100,
++		DEBUG_MT7996_IDS_ERR_LOG,
++
++		/* IDS log for mt7992 */
++		DEBUG_MT7992_IDS_PP = 94,
++		DEBUG_MT7992_IDS_RA,
++		DEBUG_MT7992_IDS_BF,
++		DEBUG_MT7992_IDS_SR,
++		DEBUG_MT7992_IDS_RU,
++		DEBUG_MT7992_IDS_MUMIMO,
++		DEBUG_MT7992_IDS_MLO = 101,
++		DEBUG_MT7992_IDS_ERR_LOG,
+ 	};
+ 	u8 debug_category[] = {
+ 		DEBUG_TXCMD,
+@@ -365,16 +380,16 @@ mt7996_fw_debug_wm_set(void *data, u64 val)
+ 		DEBUG_IDS_SND,
+ 		DEBUG_IDS_BSRP,
+ 		DEBUG_IDS_TPUT_MON,
+-		DEBUG_IDS_PP,
+-		DEBUG_IDS_RA,
+-		DEBUG_IDS_BF,
+-		DEBUG_IDS_SR,
+-		DEBUG_IDS_RU,
+-		DEBUG_IDS_MUMIMO,
+-		DEBUG_IDS_MLO,
+-		DEBUG_IDS_ERR_LOG,
++		IDS(PP),
++		IDS(RA),
++		IDS(BF),
++		IDS(SR),
++		IDS(RU),
++		IDS(MUMIMO),
++		IDS(MLO),
++		IDS(ERR_LOG),
+ 	};
+-	bool tx, rx, en;
++	bool en;
+ 	int ret;
+ 	u8 i;
+ 
+@@ -389,30 +404,38 @@ mt7996_fw_debug_wm_set(void *data, u64 val)
+ 	else
+ 		val = dev->fw_debug_wm;
+ 
+-	tx = dev->fw_debug_wm || (dev->fw_debug_bin & BIT(1));
+-	rx = dev->fw_debug_wm || (dev->fw_debug_bin & BIT(2));
+ 	en = dev->fw_debug_wm || (dev->fw_debug_bin & BIT(0));
+ 
+ 	ret = mt7996_mcu_fw_log_2_host(dev, MCU_FW_LOG_WM, val);
+ 	if (ret)
+ 		return ret;
+ 
++	if (!en) {
++		for (i = 0; i < ARRAY_SIZE(debug_category); i++) {
++			ret = mt7996_mcu_fw_dbg_ctrl(dev, debug_category[i], 0);
++			if (ret)
++				return ret;
++		}
++		return 0;
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(debug_category); i++) {
+-		if (debug_category[i] == DEBUG_RPT_RX)
+-			val = en && rx;
++		/* only enable necessary fwlog modules to prevent WM busy.
++		 * for other modules, user can enable it by using fw_debug_module
++		 * and fw_debug_level
++		 */
++		if (debug_category[i] > DEBUG_RPT_RX)
++			continue;
++
++		if (debug_category[i] == DEBUG_TXCMD ||
++		    debug_category[i] == DEBUG_IDS_SND)
++			val = 2;
+ 		else
+-			val = en && tx;
++			val = 1;
+ 
+ 		ret = mt7996_mcu_fw_dbg_ctrl(dev, debug_category[i], val);
+ 		if (ret)
+ 			return ret;
+-
+-		if ((debug_category[i] == DEBUG_TXCMD ||
+-		     debug_category[i] == DEBUG_IDS_SND) && en) {
+-			ret = mt7996_mcu_fw_dbg_ctrl(dev, debug_category[i], 2);
+-			if (ret)
+-				return ret;
+-		}
+ 	}
+ 
+ 	return 0;
+-- 
+2.45.2
+

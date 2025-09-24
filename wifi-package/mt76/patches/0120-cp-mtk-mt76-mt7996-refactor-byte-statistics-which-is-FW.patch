@@ -1,0 +1,208 @@
+From f3d375914282016108b2a1fc85078760bca210c2 Mon Sep 17 00:00:00 2001
+From: Benjamin Lin <benjamin-jw.lin@mediatek.com>
+Date: Fri, 6 Jun 2025 15:41:25 +0800
+Subject: [PATCH 01/10] mtk: mt76: mt7996 refactor byte statistics which is FW
+ dependency with new FW
+
+If you are using firmware newer than the following build dates, you must apply this driver change:
+MT7990: 2025-06-02
+MT7996: 2025-05-27
+MT7992: 2025-06-17
+
+(1) Add per-link & per-AC TX failed byte counters.
+(2) Subdivide per-link TX/RX byte counters into per-AC ones.
+(3) Clear RX MPDU counters in FW when reset_counter DebugFS knob is executed.
+
+Signed-off-by: Benjamin Lin <benjamin-jw.lin@mediatek.com>
+---
+ mt76.h               |  4 ++++
+ mt7996/debugfs.c     | 24 ++++++++++++++++++++++--
+ mt7996/mcu.c         | 26 ++++++++++++++++++++++----
+ mt7996/mcu.h         | 12 +++++++++++-
+ mt7996/mtk_debugfs.c |  4 ++++
+ 5 files changed, 63 insertions(+), 7 deletions(-)
+
+diff --git a/mt76.h b/mt76.h
+index 80256964..60895f59 100644
+--- a/mt76.h
++++ b/mt76.h
+@@ -380,6 +380,9 @@ struct mt76_sta_stats {
+ 	u64 tx_nss[4];		/* 1, 2, 3, 4 */
+ 	u64 tx_mcs[16];		/* mcs idx */
+ 	u64 tx_bytes;
++	u64 tx_bytes_per_ac[IEEE80211_NUM_ACS];
++	u64 tx_bytes_failed;
++	u64 tx_bytes_failed_per_ac[IEEE80211_NUM_ACS];
+ 	/* WED TX */
+ 	u32 tx_packets;		/* unit: MSDU */
+ 	u32 tx_packets_retried;
+@@ -390,6 +393,7 @@ struct mt76_sta_stats {
+ 	u64 tx_airtime;
+ 	/* WED RX */
+ 	u64 rx_bytes;
++	u64 rx_bytes_per_ac[IEEE80211_NUM_ACS];
+ 	u32 rx_packets;
+ 	u32 rx_mpdus;
+ 	u32 rx_fcs_err;
+diff --git a/mt7996/debugfs.c b/mt7996/debugfs.c
+index 5789e707..abfe11ec 100644
+--- a/mt7996/debugfs.c
++++ b/mt7996/debugfs.c
+@@ -1671,6 +1671,18 @@ mt7996_parse_rate(struct rate_info *rate, char *buf, size_t size)
+ 	}
+ }
+ 
++static const char *ac_to_str(enum ieee80211_ac_numbers ac)
++{
++	static const char *ac_str[] = {
++		[IEEE80211_AC_VO] = "VO",
++		[IEEE80211_AC_VI] = "VI",
++		[IEEE80211_AC_BE] = "BE",
++		[IEEE80211_AC_BK] = "BK"
++	};
++
++	return ac_str[ac];
++}
++
+ static int
+ mt7996_link_sta_info_show(struct seq_file *file, void *data)
+ {
+@@ -1683,6 +1695,7 @@ mt7996_link_sta_info_show(struct seq_file *file, void *data)
+ 	struct mt7996_phy *phy;
+ 	unsigned long rx_mask;
+ 	char buf[100];
++	u8 ac;
+ 
+ 	mutex_lock(&dev->mt76.mutex);
+ 
+@@ -1742,7 +1755,12 @@ mt7996_link_sta_info_show(struct seq_file *file, void *data)
+ 
+ 	seq_printf(file, "Statistics:\n");
+ 	seq_printf(file, "\tTX:\n");
+-	seq_printf(file, "\t\tBytes: %llu\n", stats->tx_bytes);
++	seq_printf(file, "\t\tByte Count: %llu\n", stats->tx_bytes);
++	for (ac = IEEE80211_AC_VO; ac < IEEE80211_NUM_ACS; ++ac)
++		seq_printf(file, "\t\t\t%s: %llu\n", ac_to_str(ac), stats->tx_bytes_per_ac[ac]);
++	seq_printf(file, "\t\tByte Fails: %llu\n", stats->tx_bytes_failed);
++	for (ac = IEEE80211_AC_VO; ac < IEEE80211_NUM_ACS; ++ac)
++		seq_printf(file, "\t\t\t%s: %llu\n", ac_to_str(ac), stats->tx_bytes_failed_per_ac[ac]);
+ 	seq_printf(file, "\t\tMPDU Count: %u\n", stats->tx_mpdus);
+ 	seq_printf(file, "\t\tMPDU Fails: %u (PER: %u.%u%%)\n", stats->tx_failed,
+ 		   stats->tx_mpdus ? stats->tx_failed * 1000 / stats->tx_mpdus / 10 : 0,
+@@ -1750,7 +1768,9 @@ mt7996_link_sta_info_show(struct seq_file *file, void *data)
+ 	seq_printf(file, "\t\tMPDU Retries: %u\n", stats->tx_retries);
+ 	seq_printf(file, "\t\tAirtime: %llu (unit: 1.024 us)\n", stats->tx_airtime);
+ 	seq_printf(file, "\tRX:\n");
+-	seq_printf(file, "\t\tBytes: %llu\n", stats->rx_bytes);
++	seq_printf(file, "\t\tByte Count: %llu\n", stats->rx_bytes);
++	for (ac = IEEE80211_AC_VO; ac < IEEE80211_NUM_ACS; ++ac)
++		seq_printf(file, "\t\t\t%s: %llu\n", ac_to_str(ac), stats->rx_bytes_per_ac[ac]);
+ 	seq_printf(file, "\t\tMPDU Count: %u\n", stats->rx_mpdus);
+ 	seq_printf(file, "\t\tMPDU FCS Errors: %u (PER: %u.%u%%)\n", stats->rx_fcs_err,
+ 		   stats->rx_mpdus ? stats->rx_fcs_err * 1000 / stats->rx_mpdus / 10 : 0,
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+index b52020d4..d28cdfbb 100644
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -771,11 +771,13 @@ mt7996_mcu_rx_all_sta_info_event(struct mt7996_dev *dev, struct sk_buff *skb)
+ 
+ 	for (i = 0; i < le16_to_cpu(res->sta_num); i++) {
+ 		u8 ac;
++		bool v1;
+ 		u16 wlan_idx;
+ 		struct mt76_wcid *wcid;
+ 		struct mt76_phy *mphy;
+ 		struct ieee80211_sta *sta;
+-		u32 tx_bytes, rx_bytes, tx_airtime, rx_airtime, tx_packets, rx_packets;
++		u32 tx_bytes, rx_bytes, tx_bytes_failed = 0, tx_airtime, rx_airtime,
++		    tx_packets, rx_packets;
+ 
+ 		switch (le16_to_cpu(res->tag)) {
+ 		case UNI_ALL_STA_TXRX_RATE:
+@@ -789,7 +791,11 @@ mt7996_mcu_rx_all_sta_info_event(struct mt7996_dev *dev, struct sk_buff *skb)
+ 				dev_err(dev->mt76.dev, "Failed to update TX/RX rates.\n");
+ 			break;
+ 		case UNI_ALL_STA_TXRX_ADM_STAT:
+-			wlan_idx = le16_to_cpu(res->adm_stat[i].wlan_idx);
++			v1 = le16_to_cpu(res->len) == UNI_EVENT_SIZE_ADM_STAT_V1;
++			if (v1)
++				wlan_idx = le16_to_cpu(res->adm_stat_v1[i].wlan_idx);
++			else
++				wlan_idx = le16_to_cpu(res->adm_stat_v2[i].wlan_idx);
+ 			wcid = rcu_dereference(dev->mt76.wcid[wlan_idx]);
+ 
+ 			if (!wcid)
+@@ -797,11 +803,23 @@ mt7996_mcu_rx_all_sta_info_event(struct mt7996_dev *dev, struct sk_buff *skb)
+ 
+ 			mphy = mt76_dev_phy(&dev->mt76, wcid->phy_idx);
+ 			for (ac = IEEE80211_AC_VO; ac < IEEE80211_NUM_ACS; ac++) {
+-				tx_bytes = le32_to_cpu(res->adm_stat[i].tx_bytes[ac]);
+-				rx_bytes = le32_to_cpu(res->adm_stat[i].rx_bytes[ac]);
++				u8 lmac_ac = mt76_connac_lmac_mapping(ac);
++				if (v1) {
++					tx_bytes = le32_to_cpu(res->adm_stat_v1[i].tx_bytes[lmac_ac]);
++					rx_bytes = le32_to_cpu(res->adm_stat_v1[i].rx_bytes[lmac_ac]);
++				} else {
++					tx_bytes = le32_to_cpu(res->adm_stat_v2[i].tx_bytes[lmac_ac]);
++					rx_bytes = le32_to_cpu(res->adm_stat_v2[i].rx_bytes[lmac_ac]);
++					tx_bytes_failed = le32_to_cpu(res->adm_stat_v2[i].tx_bytes_failed[lmac_ac]);
++				}
++
++				wcid->stats.tx_bytes_per_ac[ac] += tx_bytes;
++				wcid->stats.rx_bytes_per_ac[ac] += rx_bytes;
++				wcid->stats.tx_bytes_failed_per_ac[ac] += tx_bytes_failed;
+ 
+ 				wcid->stats.tx_bytes += tx_bytes;
+ 				wcid->stats.rx_bytes += rx_bytes;
++				wcid->stats.tx_bytes_failed += tx_bytes_failed;
+ 
+ 				__mt7996_stat_to_netdev(mphy, wcid,
+ 							tx_bytes, rx_bytes, 0, 0);
+diff --git a/mt7996/mcu.h b/mt7996/mcu.h
+index 1b0b5fe9..1bec110c 100644
+--- a/mt7996/mcu.h
++++ b/mt7996/mcu.h
+@@ -280,6 +280,8 @@ struct all_sta_trx_rate {
+ 	u8 __rsv2;
+ } __packed;
+ 
++#define UNI_EVENT_SIZE_ADM_STAT_V1	1452
++
+ struct mt7996_mcu_all_sta_info_event {
+ 	u8 rsv[4];
+ 	__le16 tag;
+@@ -296,7 +298,15 @@ struct mt7996_mcu_all_sta_info_event {
+ 			u8 rsv[2];
+ 			__le32 tx_bytes[IEEE80211_NUM_ACS];
+ 			__le32 rx_bytes[IEEE80211_NUM_ACS];
+-		} __packed, adm_stat);
++		} __packed, adm_stat_v1);
++
++		DECLARE_FLEX_ARRAY(struct {
++			__le16 wlan_idx;
++			u8 rsv[2];
++			__le32 tx_bytes[IEEE80211_NUM_ACS];
++			__le32 rx_bytes[IEEE80211_NUM_ACS];
++			__le32 tx_bytes_failed[IEEE80211_NUM_ACS];
++		} __packed, adm_stat_v2);
+ 
+ 		DECLARE_FLEX_ARRAY(struct {
+ 			__le16 wlan_idx;
+diff --git a/mt7996/mtk_debugfs.c b/mt7996/mtk_debugfs.c
+index 50627700..0e3c8886 100644
+--- a/mt7996/mtk_debugfs.c
++++ b/mt7996/mtk_debugfs.c
+@@ -3306,6 +3306,10 @@ mt7996_reset_counter(void *data, u64 val)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = mt7996_mcu_get_all_sta_info(mdev, UNI_ALL_STA_RX_MPDU_COUNT);
++	if (ret)
++		return ret;
++
+ 	/* Reset counters in MT76. */
+ 	rcu_read_lock();
+ 	wcid = rcu_dereference(dev->mt76.wcid[dev->wlan_idx]);
+-- 
+2.45.2
+
