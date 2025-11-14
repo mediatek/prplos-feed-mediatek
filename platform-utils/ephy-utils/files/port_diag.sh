@@ -3,9 +3,13 @@
 # This script is used to detect status of MediaTek's built-in
 # PHY.
 
-version=1.3
+version=1.4
 
 source lib.sh
+
+kernel_ver=`uname -r`
+kernel_66="6.6.0"
+sortV=$(printf '%s\n' "$kernel_66" "$kernel_ver" | sort -V | tail -1)
 
 if [ -z "$port" ]; then
 	echo "Please specify correct port."
@@ -35,10 +39,31 @@ exec_vct() {
 			#grep -E "Pair[A-D]" | sed 's/Pair[A-D]: //g' | \
 			#sed 's/ length=//g' | sed 's/\([0-9]*\+\.[0-9]*\+\)m/\1/g'
 		elif [ "${TEST_CMD}" == "mii" ]; then
+			cmd_gen 22 "read" 0x2
+			id1=$(eval "${CMD}${response}")
+			cmd_gen 22 "read" 0x3
+			id2=$(eval "${CMD}${response}")
+			phy_id=`printf "0x%x%x" ${id1} ${id2}`
+			if [ ${phy_id} == 0x339c11 ] || [ ${phy_id} == 0x339c12 ]; then
+				# This disables 1G fix for microhcip
+				cmd_gen 45 "read" 0x1e 0x40
+				val=$(eval "${CMD}${response}")
+				val=`printf "0x%x" $(( ${val} | 0x4000 ))`
+				cmd_gen 45 "write" 0x1e 0x40 ${val} && ${CMD} >> /dev/null
+			fi
+
 			/usr/sbin/mtk_vct -p ${port}
 			#/usr/sbin/mtk_vct -p ${port} | \
 			#grep -E "Pair[A-D]" | sed 's/Pair[A-D]: //g' | \
 			#sed 's/ length=//g' | sed 's/\([0-9]*\+\.[0-9]*\+\)m/\1/g'
+
+			if [ ${phy_id} == 0x339c11 ] || [ ${phy_id} == 0x339c12 ]; then
+				# This enables 1G fix for microhcip
+				cmd_gen 45 "read" 0x1e 0x40
+				val=$(eval "${CMD}${response}")
+				val=`printf "0x%x" $(( ${val} & ~0x4000 ))`
+				cmd_gen 45 "write" 0x1e 0x40 ${val} && ${CMD} >> /dev/null
+			fi
 		fi
 		let "i++"
 	done
@@ -47,16 +72,22 @@ exec_vct() {
 	ifconfig $1 up
 }
 
-hex2dec() {
-	hex="$1"
-	case "$hex" in
-		0x*|0X*)
-			printf "%d\n" "$hex"
-			;;
-		*)
-			printf "%d\n" "0x$hex"
-			;;
-	esac
+addr_trans() {
+	addr=$1
+	if [[ $sortV == "$kernel_ver" ]] && [[ "$kernel_ver" != "$kernel_66" ]]; then
+		# In kernel version greater than 6.6, ethtool uses hex value for phy address
+		case "$addr" in
+			0x*|0X*)
+				printf "%d\n" "$hex"
+				;;
+			*)
+				printf "%d\n" "0x$hex"
+				;;
+		esac
+	else
+		# In kernel version of 5.4, ethtool uses decimal value for phy address
+		printf "%d\n" $addr
+	fi
 }
 
 if [ "${TEST_CMD}" == "switch" ]; then
@@ -69,7 +100,7 @@ if [ "${TEST_CMD}" == "switch" ]; then
 		iface_name=${iface##*/}
 		if [[ "$iface_name" = "lan"* ]]; then
 			phy_addr=$(ethtool ${iface_name} | awk '/PHYAD:/ {print $2}')
-			phy_addr=$(hex2dec "$phy_addr")
+			phy_addr=$(addr_trans "$phy_addr")
 			if [ $phy_addr -eq $decimal_port ]; then
 				if="$iface_name"
 				break
@@ -93,7 +124,7 @@ if [ "${TEST_CMD}" != "switch" ]; then
 			fi
 
 			phy_addr=$(ethtool ${iface_name} | awk '/PHYAD:/ {print $2}')
-			phy_addr=$(hex2dec "$phy_addr")
+			phy_addr=$(addr_trans "$phy_addr")
 			if [ $phy_addr -eq $decimal_port ]; then
 				break
 			fi

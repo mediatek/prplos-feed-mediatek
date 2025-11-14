@@ -119,9 +119,7 @@ endif
 ifeq ($(CONFIG_OPTEE_OFFLINE_SIGN),y)
 	$(call tas-offline-sign)
 endif
-ifeq ($(CONFIG_OPTEE_EARLY_TA),y)
 	$(call Build/Compile/optee-os, EARLY_TA_BUILD)
-endif
 endef
 
 define Build/Install
@@ -144,10 +142,10 @@ define Package/optee-mediatek/install
 
 ifeq ($(CONFIG_OPTEE_RPMB_FS),y)
 	$(CP) $(PKG_BUILD_DIR)/$(OPTEE_OS_NAME)/out/arm/core/tee.bin \
-		$(BIN_DIR)/tee-spim-nand.bin
+		$(BIN_DIR)/tee-emmc.bin
 else
 	$(CP) $(PKG_BUILD_DIR)/$(OPTEE_OS_NAME)/out/arm/core/tee.bin \
-		$(BIN_DIR)/tee-emmc.bin
+		$(BIN_DIR)/tee-spim-nand.bin
 endif
 endef
 

@@ -141,6 +141,10 @@ fi
 
 echo -e "\033[1;32m === Build Extra firmware... ===\033[0m"
 make V=s -j$(($(nproc) + 1)) package/feeds/feed_mediatek/linux-firmware/{clean,prepare}
+mkdir -p ${prplos_root}/staging_dir/firmware/airoha
+cp  -rf ${prplos_root}/build_dir/target-aarch64_cortex-a53_musl/linux-firmware-20241110/airoha ${prplos_root}/staging_dir/firmware
+cp  -rf ${prplos_root}/package/feeds/feed_mediatek/aqr10g-phy-fw/files/* ${prplos_root}/staging_dir/firmware
+cp  -rf ${prplos_root}/package/feeds/feed_mediatek/as21xxx/firmware/* ${prplos_root}/staging_dir/firmware
 
 # Execute the make command using 32 threads
 echo -e "\033[1;32m === Executing make command... ===\033[0m"
