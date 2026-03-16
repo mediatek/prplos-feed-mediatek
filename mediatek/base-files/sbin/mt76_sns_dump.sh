@@ -24,6 +24,59 @@ dump_board_info() {
     do_cmd "cat /etc/config/wireless"
     do_cmd "cat /etc/config/network"
     do_cmd "iw dev"
+    do_cmd "/sbin/mtk_factory_rw.sh -r wan"
+}
+
+dump_link_sta_info() {
+    local phy="/sys/kernel/debug/ieee80211/phy0"
+
+    iw dev | awk '
+    $1 == "Interface" {iface=$2}
+    $1 == "type" {print iface, $2}
+    ' | while read iface type; do
+        [ "$type" = "AP" ] || continue
+
+        local base="${phy}/netdev:${iface}"
+        [ -d "$base" ] || { echo "[skip] ${base} not found"; continue; }
+
+        local sta_dir="${base}/stations"
+        [ -d "$sta_dir" ] || { echo "[skip] ${sta_dir} not found"; continue; }
+
+        for s in "${sta_dir}"/*; do
+            [ -d "$s" ] || continue
+            local mac
+            mac="$(basename "$s")"
+
+            for f in "$s"/link-*/link_sta_info "$s"/link_sta_info; do
+                [ -f "$f" ] || continue
+                parent="$(basename "$(dirname "$f")")"
+                case "$parent" in
+                    link-*)
+                        echo "=== iface:${iface} mac:${mac} ${parent} ==="
+                        ;;
+                    *)
+                        echo "=== iface:${iface} mac:${mac} (single-link) ==="
+                        ;;
+                esac
+                do_cmd "cat '$f'"
+                echo ""
+            done
+        done
+    done
+}
+
+dump_mt76_links_info() {
+    local phy="/sys/kernel/debug/ieee80211/phy0"
+
+    [ -d "$phy" ] || { echo "[error] $phy not found"; return; }
+
+    for f in "$phy"/*/mt76_links_info; do
+        [ -f "$f" ] || continue
+        local rel="${f#$phy/}"
+        echo "$rel"
+        do_cmd "cat '$f'"
+        echo ""
+    done
 }
 
 dump_connection_info() {
@@ -79,7 +132,6 @@ dump_ser_status() {
 }
 
 dump_sta_info() {
-    # Caution: this might cause race condition with WM firmware
     do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/sta_info"
 }
 
@@ -127,9 +179,11 @@ per_30_min_work() {
     dump_drop_stats
     dump_twt_info
     dump_ser_status
+    dump_link_sta_info
 }
 
 per_60_min_work() {
+    dump_mt76_links_info
 
     local i=0
     local max=2

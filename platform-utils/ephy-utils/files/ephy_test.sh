@@ -164,7 +164,7 @@ fi
 
 if [ "${an_type}" = "ifconfig" ] || [ "${an_type}" = "phy_power_downup" ]
 then
-	interface_down_time=2
+	interface_down_time=3
 elif [ "${an_type}" = "manual_plugin" ]
 then
 	interface_down_time=10
@@ -364,7 +364,7 @@ mii_match_port() {
 		#########################################################
 
 		# For kernel-6.6, ethtool will show port number as hex.
-		# For kernel-5.4, ethtool will show port number as decimal.
+		# For kernel-5.4/kernel-6.12, ethtool will show port number as decimal.
 		# However, it seems that this depends on your dts settings. So
 		# we transform it here if it's hex.
 		port_dump=`ethtool ${ifs} | grep -E -o "PHYAD: [0-9a-fA-F]+" | sed 's/PHYAD: //g'`
@@ -410,13 +410,12 @@ then
 	mii_match_port ${eth_folder}
 elif [ "${TEST_CMD}" = "switch" ]
 then
-	if [[ "$kernel_ver" = "6.6"* ]]
-	then
-		eth_folder_temp="${eth_prefix}/*/15020000.switch/net/"
-		eth_folder=$(echo $eth_folder_temp)
-	elif [[ "$kernel_ver" = "5.4"* ]]
+	if [[ "$kernel_ver" = "5.4"* ]]
 	then
 		eth_folder="${eth_prefix}/${eth_baseaddr}.ethernet/mdio_bus/mdio-bus/mdio-bus:1f/net/"
+	else
+		eth_folder_temp="${eth_prefix}/*/15020000.switch/net/"
+		eth_folder=$(echo $eth_folder_temp)
 	fi
 
 	if [ ! -d "${eth_folder}" ]
@@ -732,6 +731,7 @@ print_summary() {
 	echo "[Total]"
 	echo "Total 1st down~last up time: ${total_firstdown_to_lastup}s"
 	echo "Average 1st down~last up time: ${avg_firstdown_to_lastup}s"
+	# If we test N times, relink happens N+2 times, it means that 2 retries take place.
 	echo "Test ${index} times, total relink ${total_linkup_cnt} times"
 	echo "Average unit linkup time: ${avg_linkup_time}s"
 	echo "Max unit link time: ${max_linkup_time}s, Min unit link time: ${min_linkup_time}s"

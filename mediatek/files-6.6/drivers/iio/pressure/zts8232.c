@@ -262,8 +262,8 @@ static int zts8232_config(struct zts8232_data *data, enum zts8232_op_mode op_mod
 			  enum zts8232_FIFO_readout_mode fifo_read_mode);
 static void inv_run_zts8232_in_polling(struct zts8232_data *data, enum zts8232_op_mode op_mode,
 				       uint16_t odr_hz);
-static int zts8232_probe(struct i2c_client *client, const struct i2c_device_id *id);
-static int zts8232_remove(struct i2c_client *client);
+static int zts8232_probe(struct i2c_client *client);
+static void zts8232_remove(struct i2c_client *client);
 
 static const struct iio_chan_spec zts8232_channels[] = {
 	{
@@ -897,9 +897,7 @@ int zts8232_app_pre_start_config(struct zts8232_data *data, enum zts8232_op_mode
 static void zts8232_app_warmup(struct zts8232_data *data, enum zts8232_op_mode op_mode,
 			       enum zts8232_meas_mode meas_mode)
 {
-	uint8_t fifo_packets = 0;
 	uint8_t fifo_packets_to_skip = 14;
-	int status;
 	uint8_t pres_osr, temp_osr, HFOSC_on, DVDD_on, IIR_filter_en, FIR_filter_en, pres_bs,
 	    temp_bs;
 	uint16_t odr = 0, IIR_k = 0, press_gain = 0;
@@ -1087,7 +1085,7 @@ static int zts8232_config(struct zts8232_data *data, enum zts8232_op_mode op_mod
 static void inv_run_zts8232_in_polling(struct zts8232_data *data, enum zts8232_op_mode op_mode,
 				       uint16_t odr_hz)
 {
-	int status, temp;
+	int status;
 
 	status = zts8232_soft_reset(data);
 	if (status)
@@ -1121,8 +1119,9 @@ static const struct iio_info zts8232_info = {
 	.write_raw = zts8232_write_raw,
 };
 
-static int zts8232_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int zts8232_probe(struct i2c_client *client)
 {
+	const struct i2c_device_id *id = i2c_client_get_device_id(client);
 	struct zts8232_data *data;
 	struct iio_dev *iio;
 	int rc;
@@ -1149,14 +1148,14 @@ static int zts8232_probe(struct i2c_client *client, const struct i2c_device_id *
 	rc = zts8232_soft_reset(data);
 	if (rc) {
 		pr_info("soft reset error %d\n", rc);
-		goto error_free_device;
+		return rc;
 	}
 
 	rc = zts8232_init_chip(data);
 	if (rc) {
 		dev_err(&client->dev, "init chip error %d\n", rc);
 		pr_info("init chip error %d\n", rc);
-		goto error_free_device;
+		return rc;
 	}
 
 	inv_run_zts8232_in_polling(data, atomic_read(&data->mode), data->frequency);
@@ -1171,21 +1170,16 @@ static int zts8232_probe(struct i2c_client *client, const struct i2c_device_id *
 	rc = devm_iio_device_register(&client->dev, iio);
 	if (rc) {
 		dev_err(&client->dev, "iio device register error %d\n", rc);
-		goto error_free_device;
+		return rc;
 	}
 
 	i2c_set_clientdata(client, iio);
 	pr_info("ZTS8232 probe done");
 	return 0;
-
-error_free_device:
-	iio_device_free(iio);
-	return rc;
 }
 
-static int zts8232_remove(struct i2c_client *client)
+static void zts8232_remove(struct i2c_client *client)
 {
-	return 0;
 }
 
 static const struct i2c_device_id zts8232_id[] = {{ZTS8232_DEV_NAME, 0}, {}};
