@@ -1,7 +1,7 @@
-From 8fae5b290dca553ef2cadd9433dea1c99ea8ce12 Mon Sep 17 00:00:00 2001
+From bd7df358028f10327ec3b6066f3d4af2c7436159 Mon Sep 17 00:00:00 2001
 From: Shayne Chen <shayne.chen@mediatek.com>
 Date: Mon, 21 Oct 2024 19:00:13 +0800
-Subject: [PATCH 3/9] openwrt: vif radio mask
+Subject: [PATCH 10/17] openwrt: vif radio mask
 
 ---
  interface.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++--

@@ -1,7 +1,7 @@
-From 9da422b4105567858edd967486a8ccd24f563670 Mon Sep 17 00:00:00 2001
+From d1f53e1ffea7cb02151626829cb6bd598556f919 Mon Sep 17 00:00:00 2001
 From: Howard Hsu <howard-yh.hsu@mediatek.com>
 Date: Thu, 30 May 2024 10:17:29 +0800
-Subject: [PATCH 5/9] iw: support link id in set bitrates command
+Subject: [PATCH 12/17] iw: support link id in set bitrates command
 
 Since NL80211_CMD_SET_TX_BITRATE_MASK includes flag
 NL80211_FLAG_MLO_VALID_LINK_ID, nl80211_pre_do_it() will check whether
@@ -19,10 +19,10 @@ Signed-off-by: MeiChia Chiu <MeiChia.Chiu@mediatek.com>
  1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/bitrate.c b/bitrate.c
-index 8714669..82c5900 100644
+index 4ed7f2a..4030909 100644
 --- a/bitrate.c
 +++ b/bitrate.c
-@@ -146,7 +146,7 @@ int set_bitrates(struct nl_msg *msg,
+@@ -198,7 +198,7 @@ int set_bitrates(struct nl_msg *msg,
  		 enum nl80211_attrs attr)
  {
  	struct nlattr *nl_rates, *nl_band;
@@ -31,8 +31,8 @@ index 8714669..82c5900 100644
  	bool have_legacy_24 = false, have_legacy_5 = false;
  	uint8_t legacy_24[32], legacy_5[32];
  	int n_legacy_24 = 0, n_legacy_5 = 0;
-@@ -190,7 +190,24 @@ int set_bitrates(struct nl_msg *msg,
- 		S_HE_LTF,
+@@ -257,7 +257,24 @@ int set_bitrates(struct nl_msg *msg,
+ 		S_EHT_LTF,
  	} parser_state = S_NONE;
  
 -	for (i = 0; i < argc; i++) {

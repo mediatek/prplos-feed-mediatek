@@ -1,7 +1,7 @@
-From 1196bf9875ff469eabec9350c604d6e47ae602e9 Mon Sep 17 00:00:00 2001
+From 9e358352ebf68a808a358477a70cedadc7ae3c9c Mon Sep 17 00:00:00 2001
 From: StanleyYP Wang <StanleyYP.Wang@mediatek.com>
 Date: Wed, 4 Dec 2024 11:25:23 +0800
-Subject: [PATCH 8/9] iw: add radio mask for scanning
+Subject: [PATCH 15/17] iw: add radio mask for scanning
 
 Add radio mask for scanning
 
@@ -26,7 +26,7 @@ index 778b10d..1905e56 100644
  	unsigned int mask = 0;
  	unsigned long id;
 diff --git a/iw.h b/iw.h
-index 145b058..0cec89e 100644
+index df9ea13..5d182cf 100644
 --- a/iw.h
 +++ b/iw.h
 @@ -252,6 +252,7 @@ void print_eht_operation(const uint8_t *ie, int len);

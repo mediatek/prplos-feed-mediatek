@@ -13,6 +13,7 @@ let idx = 0;
 let commit;
 
 let random_mac_bytes = getenv("MT76_ENV_RANDOM_MAC_BYTES");
+
 let config = uci.cursor().get_all("wireless") ?? {};
 
 function radio_exists(path, macaddr, phy, radio) {
@@ -34,13 +35,25 @@ function radio_exists(path, macaddr, phy, radio) {
 
 for (let phy_name, phy in board.wlan) {
 	let info = phy.info;
+	let has_mlo = false;
+
 	if (!info || !length(info.bands))
 		continue;
 
-	if (phy_name != "phy0")
-		continue;
+	for (let band_name, band in info.bands) {
+		for (let mode in band.modes) {
+			if (wildcard(mode, 'EHT*')) {
+				has_mlo = true;
+				break;
+			}
+		}
+
+		if (has_mlo)
+			break;
+	}
 
 	let radios = [];
+	let device_list = [];
 	if (length(info.radios) > 0) {
 		radios = info.radios;
 	} else {
@@ -193,6 +206,7 @@ set ${si_bh}.ssid=${ssid_bh}
 `);
 
 		config[name] = {};
+		push(device_list, name);
 		commit = true;
 	}
 

@@ -1,7 +1,7 @@
-From fe81d57df288ec351e0b0aef3ae0350383d39a08 Mon Sep 17 00:00:00 2001
+From ea9c162ce6e17a3540b5d967b297c84a9614941d Mon Sep 17 00:00:00 2001
 From: Shayne Chen <shayne.chen@mediatek.com>
 Date: Tue, 19 Aug 2025 17:52:59 +0800
-Subject: [PATCH 9/9] mtk: iw: support per-radio txpower setting
+Subject: [PATCH 16/17] mtk: iw: support per-radio txpower setting
 
 Usage:
 iw phy phy0 set txpower fixed 1600 radio 0
@@ -9,12 +9,16 @@ iw phy phy0 set txpower fixed 1600 radio 1
 iw phy phy0 set txpower fixed 1600 radio 2
 
 Signed-off-by: Shayne Chen <shayne.chen@mediatek.com>
+
+Fix iw should correctly return when input wrong argument format.
+
+Signed-off-by: Allen Ye <allen.ye@mediatek.com>
 ---
  phy.c | 29 ++++++++++++++++++++++-------
  1 file changed, 22 insertions(+), 7 deletions(-)
 
 diff --git a/phy.c b/phy.c
-index 03a7822..a1df3fd 100644
+index 03a7822..d59fc51 100644
 --- a/phy.c
 +++ b/phy.c
 @@ -706,10 +706,11 @@ static int handle_txpower(struct nl80211_state *state,
@@ -26,7 +30,7 @@ index 03a7822..a1df3fd 100644
  
  	/* get the required args */
 -	if (argc != 1 && argc != 2)
-+	if (argc <= 0 && argc > 4)
++	if (argc <= 0 || argc > 4)
  		return 1;
  
  	if (!strcmp(argv[0], "auto"))
