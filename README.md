@@ -8,7 +8,7 @@ and [filogic850](https://www.mediatek.com/products/broadband-wifi/mediatek-filog
 However you shall know the feature sets would be limited by the Prpl Feed Package readiness. (Ex: Wi-Fi7 MLO and Secure Boot..) 
 
 ## Getting Started with feed-mediatek
-Based on 2025.09 PrplOS repository status, the latest branch of mainline is latest-24.10. So we take this branch as an example.
+Based on 2026.03 PrplOS repository status, the latest branch of mainline is latest-24.10. So we take this branch as an example.
 Please be noted this prpl mediatek feed shall fit after PrplOS4.1 versions.
 
 #### 1. Clone prplOS
@@ -67,7 +67,7 @@ feeds:
   - name: feed_mediatek
     uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
     tracking_branch: prplos-4.1
-    revision: 5d8bac6145dae5cbe1a82c273744126375a64875
+    revision: e3369a85405b1e951c462b26f851389fce807b40
 ```
 
 #### 4. Configure prplOS with common prplMesh
@@ -117,11 +117,12 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 ![feed_mediatek_layout](feed_mtk_4.1_layout.png)
 
 ## Feed-Mediatek Prpl Release
-- Date: 2025-09-23
+- Date: 2026-03-25
 - Modified By: Evelyn Tsai (evelyn.tsai@mediatek.com)
 ### Release History
 | Date       | OpenWrt Source   |
 |------------|------------------|
+| 2026.03.25 | Sync from [OpenWrt WiFi7 MP4.3 Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/Readme-6.12.md#wi_fi-7-latest-release-version) |
 | 2025.09.23 | Sync from [OpenWrt WiFi7 MP4.2 Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/#filogic-880_860_850-wifi7-mp4_2-release-2025_09_12) |
 
 ## pWHM Version status
