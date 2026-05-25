@@ -39,11 +39,10 @@ prepare_key_wep() {
 }
 
 _wdev_prepare_channel() {
-	json_get_vars channel band hwmode
+	json_get_vars channel band hwmode htmode
 
 	auto_channel=0
 	enable_ht=0
-	htmode=
 	hwmode="${hwmode##11}"
 
 	case "$channel" in
@@ -79,6 +78,11 @@ _wdev_prepare_channel() {
 				*b|*g) band=2g;;
 			esac
 		;;
+	esac
+
+	case "$htmode" in
+		HE*|EHT*) wpa3_cipher="GCMP-256 ";;
+		*) wpa3_cipher="";;
 	esac
 }
 
@@ -204,59 +208,30 @@ _wdev_wrapper \
 	wireless_process_kill_all \
 	wireless_set_retry \
 
-wireless_vif_parse_encryption_rsno() {
-	json_get_vars encryption_rsno encryption_rsno_2
-	set_default encryption_rsno none
-	set_default encryption_rsno_2 none
-
-	rsno_auth_type=none
-	rsno_auth_type_2=none
-	rsno_wpa_cipher="CCMP"
-	rsno_wpa_cipher_2="GCMP-256"
-
-	case "$encryption_rsno" in
-		*ccmp256) rsno_wpa_cipher="CCMP-256";;
-		*aes|*ccmp) rsno_wpa_cipher="CCMP";;
-		*gcmp256) rsno_wpa_cipher="GCMP-256";;
-		*gcmp) rsno_wpa_cipher="GCMP";;
-	esac
-
-	case "$encryption_rsno_2" in
-		*ccmp256) rsno_wpa_cipher_2="CCMP-256";;
-		*aes|*ccmp) rsno_wpa_cipher_2="CCMP";;
-		*gcmp256) rsno_wpa_cipher_2="GCMP-256";;
-		*gcmp) rsno_wpa_cipher_2="GCMP";;
-	esac
-
-	case "$encryption_rsno" in
-		psk3*|sae*)
-			rsno_auth_type=sae
-		;;
-	esac
-
-	case "$encryption_rsno_2" in
-		psk3*|sae*)
-			rsno_auth_type_2=sae
-		;;
-	esac
-}
-
 wireless_vif_parse_encryption() {
-	json_get_vars encryption
+	json_get_vars encryption rsn_override
 	set_default encryption none
 
+	set_default rsn_override 1
 	auth_mode_open=1
 	auth_mode_shared=0
 	auth_type=none
+	wpa_override_cipher=
+	rsn_override_pairwise=
 
 	if [ "$hwmode" = "ad" ]; then
 		wpa_cipher="GCMP"
-	elif [ "$_w_mode" = "sta" ]; then
-		wpa_cipher="CCMP CCMP-256 GCMP GCMP-256"
-	elif [ "$encryption" == "sae-ext" ] ;then
-		wpa_cipher="GCMP-256"
 	else
 		wpa_cipher="CCMP"
+		case "$encryption" in
+			sae*|wpa3*|psk3*|owe)
+				if [ "$rsn_override" -gt 0 ]; then
+					wpa_override_cipher="${wpa3_cipher}$wpa_cipher"
+				else
+					wpa_cipher="${wpa3_cipher}$wpa_cipher"
+				fi
+			;;
+		esac
 	fi
 
 	case "$encryption" in
@@ -267,7 +242,7 @@ wireless_vif_parse_encryption() {
 		*gcmp256) wpa_cipher="GCMP-256";;
 		*gcmp) wpa_cipher="GCMP";;
 		wpa3-192*) wpa_cipher="GCMP-256";;
-		sae_sae-ext) wpa_cipher="CCMP GCMP-256";;
+		*) rsn_override_pairwise="$wpa_override_cipher";;
 	esac
 
 	# 802.11n requires CCMP for WPA
@@ -331,18 +306,6 @@ wireless_vif_parse_encryption() {
 					auth_mode_shared=1
 				;;
 			esac
-		;;
-	esac
-
-	case "$encryption" in
-		*nosha256*)
-			nosha256=1
-		;;
-	esac
-
-	case "$encryption" in
-		*osen*)
-			auth_osen=1
 		;;
 	esac
 }
@@ -426,7 +389,6 @@ _wdev_common_device_config() {
 
 _wdev_common_iface_config() {
 	config_add_string mode ssid encryption 'key:wpakey'
-	config_add_string encryption_rsno encryption_rsno_2
 	config_add_boolean bridge_isolate
 	config_add_array tags
 }

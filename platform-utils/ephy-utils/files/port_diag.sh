@@ -3,36 +3,91 @@
 # This script is used to detect status of MediaTek's built-in
 # PHY.
 
+version=1.4
+
 source lib.sh
 
-total_round=1
+kernel_ver=`uname -r`
+kernel_66="6.6.0"
+sortV=$(printf '%s\n' "$kernel_66" "$kernel_ver" | sort -V | tail -1)
+
+if [ -z "$port" ]; then
+	echo "Please specify correct port."
+	exit 1
+fi
+
+if [ -z "$round" ]; then
+	echo "\"-r\" is not specified and set to 5 by default."
+	round=5
+fi
+
 decimal_port=$(printf "%d" ${port})
 
 exec_vct() {
 	ifconfig $1 down
 	echo "Wait a minute if disconnection takes time"
-	cmd_gen 22 "write" 0x0 0x1040 && ${CMD} > /dev/null
+	cmd_gen 22 "write" 0x0 0x9040 && ${CMD} > /dev/null
 	sleep 1
 
-	round=1
-	while [ ! ${round} -gt ${total_round} ]
+	i=1
+	while [ ! ${i} -gt ${round} ]
 	do
-		echo "######## VCT test round${round} ########"
+		echo "######## VCT test round${i} ########"
 		if [ "${TEST_CMD}" == "switch" ]; then
 			/usr/sbin/mtk_vct -s -p ${port}
 			#/usr/sbin/mtk_vct -s -p ${port} | \
 			#grep -E "Pair[A-D]" | sed 's/Pair[A-D]: //g' | \
 			#sed 's/ length=//g' | sed 's/\([0-9]*\+\.[0-9]*\+\)m/\1/g'
 		elif [ "${TEST_CMD}" == "mii" ]; then
+			cmd_gen 22 "read" 0x2
+			id1=$(eval "${CMD}${response}")
+			cmd_gen 22 "read" 0x3
+			id2=$(eval "${CMD}${response}")
+			phy_id=`printf "0x%x%x" ${id1} ${id2}`
+			if [ ${phy_id} == 0x339c11 ] || [ ${phy_id} == 0x339c12 ]; then
+				# This disables 1G fix for microhcip
+				cmd_gen 45 "read" 0x1e 0x40
+				val=$(eval "${CMD}${response}")
+				val=`printf "0x%x" $(( ${val} | 0x4000 ))`
+				cmd_gen 45 "write" 0x1e 0x40 ${val} && ${CMD} >> /dev/null
+			fi
+
 			/usr/sbin/mtk_vct -p ${port}
 			#/usr/sbin/mtk_vct -p ${port} | \
 			#grep -E "Pair[A-D]" | sed 's/Pair[A-D]: //g' | \
 			#sed 's/ length=//g' | sed 's/\([0-9]*\+\.[0-9]*\+\)m/\1/g'
+
+			if [ ${phy_id} == 0x339c11 ] || [ ${phy_id} == 0x339c12 ]; then
+				# This enables 1G fix for microhcip
+				cmd_gen 45 "read" 0x1e 0x40
+				val=$(eval "${CMD}${response}")
+				val=`printf "0x%x" $(( ${val} & ~0x4000 ))`
+				cmd_gen 45 "write" 0x1e 0x40 ${val} && ${CMD} >> /dev/null
+			fi
 		fi
-		let "round++"
+		let "i++"
 	done
 
+	sleep 1 #Make sure that PHY bringup kernel log won't mess up VCT results.
 	ifconfig $1 up
+}
+
+addr_trans() {
+	addr=$1
+	if [[ $sortV == "$kernel_ver" ]] && [[ "$kernel_ver" != "$kernel_66" ]]; then
+		# In kernel version greater than 6.6, ethtool uses hex value for phy address
+		case "$addr" in
+			0x*|0X*)
+				printf "%d\n" "$hex"
+				;;
+			*)
+				printf "%d\n" "0x$hex"
+				;;
+		esac
+	else
+		# In kernel version of 5.4, ethtool uses decimal value for phy address
+		printf "%d\n" $addr
+	fi
 }
 
 if [ "${TEST_CMD}" == "switch" ]; then
@@ -41,16 +96,42 @@ if [ "${TEST_CMD}" == "switch" ]; then
 		exit 1
 	fi
 
-	if="lan${decimal_port}"
+	for iface in /sys/class/net/*; do
+		iface_name=${iface##*/}
+		if [[ "$iface_name" = "lan"* ]]; then
+			phy_addr=$(ethtool ${iface_name} | awk '/PHYAD:/ {print $2}')
+			phy_addr=$(addr_trans "$phy_addr")
+			if [ $phy_addr -eq $decimal_port ]; then
+				if="$iface_name"
+				break
+			fi
+		fi
+	done
 fi
 
 if [ "${TEST_CMD}" != "switch" ]; then
 	TEST_CMD="mii"
-	if [ ${decimal_port} -eq 0 ]; then
-		if="eth0" # mt7981 built-in Gphy
-	elif [ ${decimal_port} -eq 15 ]; then
-		if="eth1" # mt7988/mt7987 build-in 2.5G phy
-	fi
+	for iface in /sys/class/net/*; do
+		iface_name=${iface##*/}
+		if [[ "$iface_name" = "lan"* ]]; then
+			continue
+		fi
+
+		if [ -d "$iface" ]; then
+			phydev=$(readlink $iface/phydev)
+			if [ -z "$phydev" ]; then
+				continue
+			fi
+
+			phy_addr=$(ethtool ${iface_name} | awk '/PHYAD:/ {print $2}')
+			phy_addr=$(addr_trans "$phy_addr")
+			if [ $phy_addr -eq $decimal_port ]; then
+				break
+			fi
+		fi
+	done
+
+	if="$iface_name"
 fi
 
 cmd_gen 22 "read" 0x1
@@ -86,8 +167,8 @@ flag && /baseT/ {
 	}
 }'`
 
-ethtool_link_speed=`ethtool eth1 | awk '/Speed:/ {print $2}' | sed 's/Mb\/s//'`
-ethtool_link_duplex=`ethtool eth1 | awk '/Duplex:/ {print $2}'`
+ethtool_link_speed=`ethtool ${if} | awk '/Speed:/ {print $2}' | sed 's/Mb\/s//'`
+ethtool_link_duplex=`ethtool ${if} | awk '/Duplex:/ {print $2}'`
 
 # Check my highest link mode. If the tested PHY doesn't link with
 # link partner with this link mode and downshift does happen,

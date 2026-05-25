@@ -164,7 +164,7 @@ fi
 
 if [ "${an_type}" = "ifconfig" ] || [ "${an_type}" = "phy_power_downup" ]
 then
-	interface_down_time=2
+	interface_down_time=3
 elif [ "${an_type}" = "manual_plugin" ]
 then
 	interface_down_time=10
@@ -315,6 +315,11 @@ dsa_match_port() {
 	for ifs in ${interfaces}
 	do
 		port_dump=`ethtool ${ifs} | grep -E -o "PHYAD: [0-9a-fA-F]+" | sed 's/PHYAD: //g'`
+		if [[ "$kernel_ver" = "6.6"* ]]
+		then
+			port_dump=`printf "%d" 0x$port_dump`
+		fi
+
 		if [ ${port_dump} -eq ${port_decimal} ]
 		then
 			target_interface=${ifs}
@@ -330,11 +335,19 @@ mii_match_port() {
 	for ifs in ${interfaces}
 	do
 		#### Check if this interface is on the top of switch ####
-
-		if [[ "$kernel_ver" = "6.6"* ]]; then
-			mac_port=`readlink ${eth_prefix}/*/${eth_baseaddr}.ethernet/net/${ifs}/of_node`
-		elif [[ "$kernel_ver" = "5.4"* ]]; then
-			mac_port=`readlink ${eth_prefix}/${eth_baseaddr}.ethernet/net/${ifs}/of_node`
+		eth_found=0
+		for path in \
+		${eth_prefix}/${eth_baseaddr}.ethernet/net/${ifs}/of_node \
+		${eth_prefix}/*/${eth_baseaddr}.ethernet/net/${ifs}/of_node; do
+			if [ -e "$path" ]; then
+				mac_port=`readlink $path`
+				eth_found=1
+				break
+			fi
+		done
+		if [ $eth_found -eq 0 ]; then
+			echo "eth interface of_node not found"
+			exit 1
 		fi
 
 		if [ -n "${mac_port}" ]; then
@@ -351,11 +364,12 @@ mii_match_port() {
 		#########################################################
 
 		# For kernel-6.6, ethtool will show port number as hex.
-		# For kernel-5.4, ethtool will show port number as decimal.
+		# For kernel-5.4/kernel-6.12, ethtool will show port number as decimal.
 		# However, it seems that this depends on your dts settings. So
 		# we transform it here if it's hex.
 		port_dump=`ethtool ${ifs} | grep -E -o "PHYAD: [0-9a-fA-F]+" | sed 's/PHYAD: //g'`
-		if [[ $port_dump =~ ^[0-9a-fA-F]+$ ]]; then
+		if [[ "$kernel_ver" = "6.6"* ]]
+		then
 			port_dump=`printf "%d" 0x$port_dump`
 		fi
 
@@ -372,11 +386,21 @@ mii_match_port() {
 is_portMatch=0
 if [ "${TEST_CMD}" = "mii" ]
 then
-	if [[ "$kernel_ver" = "6.6"* ]]; then
-		eth_folder_temp="${eth_prefix}/*/${eth_baseaddr}.ethernet/net/"
-	elif [[ "$kernel_ver" = "5.4"* ]]; then
-		eth_folder_temp="${eth_prefix}/${eth_baseaddr}.ethernet/net/"
+	eth_found=0
+	for path in \
+	${eth_prefix}/${eth_baseaddr}.ethernet/net/ \
+	${eth_prefix}/*/${eth_baseaddr}.ethernet/net/; do
+		if [ -e "$path" ]; then
+			eth_folder_temp=$path
+			eth_found=1
+			break
+		fi
+	done
+	if [ $eth_found -eq 0 ]; then
+		echo "eth folder not found"
+		exit 1
 	fi
+
 	eth_folder=$(echo $eth_folder_temp)
 	if [ ! -d ${eth_folder} ]
 	then
@@ -386,13 +410,12 @@ then
 	mii_match_port ${eth_folder}
 elif [ "${TEST_CMD}" = "switch" ]
 then
-	if [[ "$kernel_ver" = "6.6"* ]]
-	then
-		eth_folder_temp="${eth_prefix}/*/15020000.switch/net/"
-		eth_folder=$(echo $eth_folder_temp)
-	elif [[ "$kernel_ver" = "5.4"* ]]
+	if [[ "$kernel_ver" = "5.4"* ]]
 	then
 		eth_folder="${eth_prefix}/${eth_baseaddr}.ethernet/mdio_bus/mdio-bus/mdio-bus:1f/net/"
+	else
+		eth_folder_temp="${eth_prefix}/*/15020000.switch/net/"
+		eth_folder=$(echo $eth_folder_temp)
 	fi
 
 	if [ ! -d "${eth_folder}" ]
@@ -708,6 +731,7 @@ print_summary() {
 	echo "[Total]"
 	echo "Total 1st down~last up time: ${total_firstdown_to_lastup}s"
 	echo "Average 1st down~last up time: ${avg_firstdown_to_lastup}s"
+	# If we test N times, relink happens N+2 times, it means that 2 retries take place.
 	echo "Test ${index} times, total relink ${total_linkup_cnt} times"
 	echo "Average unit linkup time: ${avg_linkup_time}s"
 	echo "Max unit link time: ${max_linkup_time}s, Min unit link time: ${min_linkup_time}s"

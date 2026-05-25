@@ -159,6 +159,7 @@ atenl_eeprom_init_chip_id(struct atenl *an)
 	case MT7996_DEVICE_ID:
 	case MT7992_DEVICE_ID:
 	case MT7990_DEVICE_ID:
+	case MT7999_DEVICE_ID:
 		/* TODO: parse info if required */
 		break;
 	default:
@@ -188,6 +189,10 @@ atenl_eeprom_init_max_size(struct atenl *an)
 	case MT7990_DEVICE_ID:
 		an->eeprom_size = 7680;
 		an->eeprom_prek_offs = 0x1a5;
+		break;
+	case MT7999_DEVICE_ID:
+		an->eeprom_size = 25600;
+		an->eeprom_prek_offs = 0x1a5;
 	default:
 		break;
 	}
@@ -196,7 +201,7 @@ atenl_eeprom_init_max_size(struct atenl *an)
 static void
 atenl_eeprom_init_band_cap(struct atenl *an)
 {
-#define EAGLE_BAND_SEL(index)	MT_EE_WIFI_EAGLE_CONF##index##_BAND_SEL
+#define CONNAC3_BAND_SEL(index)		MT_EE_WIFI_CONNAC3_CONF_BAND##index##_SEL
 	u8 *eeprom = an->eeprom_data;
 
 	if (is_mt7915(an)) {
@@ -253,64 +258,67 @@ atenl_eeprom_init_band_cap(struct atenl *an)
 				break;
 			}
 		}
-	} else if (is_mt7996(an)) {
+	} else if (is_connac3(an)) {
 		struct atenl_band *anb;
 		u8 val, band_sel;
-		u8 band_sel_mask[3] = {EAGLE_BAND_SEL(0), EAGLE_BAND_SEL(1),
-				       EAGLE_BAND_SEL(2)};
+		u8 band_sel_mask[MAX_BAND_NUM] = {CONNAC3_BAND_SEL(0), CONNAC3_BAND_SEL(1),
+						  CONNAC3_BAND_SEL(2)};
+		u16 band_sel_offs[MAX_BAND_NUM] = {MT_EE_WIFI_CONF, MT_EE_WIFI_CONF,
+						   MT_EE_WIFI_CONF + 1};
 		int i;
 
-		for (i = 0; i < 3; i++) {
-			val = eeprom[MT_EE_WIFI_CONF + i];
+		for (i = 0; i < MAX_BAND_NUM; i++) {
+			val = eeprom[band_sel_offs[i]];
 			band_sel = FIELD_GET(band_sel_mask[i], val);
 			anb = &an->anb[i];
 
 			anb->valid = true;
 			switch (band_sel) {
-			case MT_EE_EAGLE_BAND_SEL_2GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_2GHZ:
 				anb->cap = BAND_TYPE_2G;
 				break;
-			case MT_EE_EAGLE_BAND_SEL_5GHZ_LOW:
-			case MT_EE_EAGLE_BAND_SEL_5GHZ_HIGH:
-			case MT_EE_EAGLE_BAND_SEL_5GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ_LOW:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ_HIGH:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ:
 				anb->cap = BAND_TYPE_5G;
 				break;
-			case MT_EE_EAGLE_BAND_SEL_6GHZ_LOW:
-			case MT_EE_EAGLE_BAND_SEL_6GHZ_HIGH:
-			case MT_EE_EAGLE_BAND_SEL_6GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ_LOW:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ_HIGH:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ:
 				anb->cap = BAND_TYPE_6G;
 				break;
 			default:
+				anb->valid = false;
 				break;
 			}
 		}
-	} else if (is_mt7992(an) || is_mt7990(an)) {
+	} else if (is_connac5(an)) {
 		struct atenl_band *anb;
 		u8 val, band_sel;
-		u8 band_sel_mask[2] = {EAGLE_BAND_SEL(0), EAGLE_BAND_SEL(1)};
 		int i;
 
-		for (i = 0; i < 2; i++) {
-			val = eeprom[MT_EE_WIFI_CONF + i];
-			band_sel = FIELD_GET(band_sel_mask[i], val);
+		for (i = 0; i < MAX_BAND_NUM; i++) {
+			val = eeprom[MT_EE_WIFI_CONNAC5_CONF(i)];
+			band_sel = FIELD_GET(MT_EE_WIFI_CONNAC5_CONF_BAND_SEL, val);
 			anb = &an->anb[i];
 
 			anb->valid = true;
 			switch (band_sel) {
-			case MT_EE_EAGLE_BAND_SEL_2GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_2GHZ:
 				anb->cap = BAND_TYPE_2G;
 				break;
-			case MT_EE_EAGLE_BAND_SEL_5GHZ_LOW:
-			case MT_EE_EAGLE_BAND_SEL_5GHZ_HIGH:
-			case MT_EE_EAGLE_BAND_SEL_5GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ_LOW:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ_HIGH:
+			case MT_EE_CONNAC3_BAND_SEL_5GHZ:
 				anb->cap = BAND_TYPE_5G;
 				break;
-			case MT_EE_EAGLE_BAND_SEL_6GHZ_LOW:
-			case MT_EE_EAGLE_BAND_SEL_6GHZ_HIGH:
-			case MT_EE_EAGLE_BAND_SEL_6GHZ:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ_LOW:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ_HIGH:
+			case MT_EE_CONNAC3_BAND_SEL_6GHZ:
 				anb->cap = BAND_TYPE_6G;
 				break;
 			default:
+				anb->valid = false;
 				break;
 			}
 		}
@@ -322,41 +330,67 @@ atenl_eeprom_init_antenna_cap(struct atenl *an)
 {
 	switch (an->chip_id) {
 	case MT7915_DEVICE_ID:
-		if (an->anb[0].cap == BAND_TYPE_2G_5G)
-			an->anb[0].chainmask = 0xf;
-		else {
-			an->anb[0].chainmask = 0x3;
-			an->anb[1].chainmask = 0xc;
+		if (an->anb[0].cap == BAND_TYPE_2G_5G) {
+			an->anb[0].chainmask = FIELD_GET(GENMASK(2, 0),
+							 an->eeprom_data[MT_EE_WIFI_CONF]);
+			an->anb[0].rx_chainmask = FIELD_GET(GENMASK(5, 3),
+							    an->eeprom_data[MT_EE_WIFI_CONF]);
+		} else {
+			an->anb[0].chainmask = FIELD_GET(GENMASK(1, 0),
+							 an->eeprom_data[MT_EE_WIFI_CONF + 3]);
+			an->anb[1].chainmask = FIELD_GET(GENMASK(5, 4),
+							 an->eeprom_data[MT_EE_WIFI_CONF + 3]);
+
+			an->anb[0].rx_chainmask = FIELD_GET(GENMASK(3, 2),
+							    an->eeprom_data[MT_EE_WIFI_CONF + 3]);
+			an->anb[1].rx_chainmask = FIELD_GET(GENMASK(7, 6),
+							    an->eeprom_data[MT_EE_WIFI_CONF + 3]);
 		}
 		break;
 	case MT7916_EEPROM_CHIP_ID:
 	case MT7916_DEVICE_ID:
-		an->anb[0].chainmask = 0x3;
-		an->anb[1].chainmask = 0x3;
-		break;
 	case MT7981_DEVICE_ID:
-		an->anb[0].chainmask = 0x3;
-		an->anb[1].chainmask = 0x7;
-		break;
 	case MT7986_DEVICE_ID:
-		an->anb[0].chainmask = 0xf;
-		an->anb[1].chainmask = 0xf;
+		an->anb[0].chainmask = FIELD_GET(GENMASK(2, 0),
+						 an->eeprom_data[MT_EE_WIFI_CONF]);
+		an->anb[1].chainmask = FIELD_GET(GENMASK(2, 0),
+						 an->eeprom_data[MT_EE_WIFI_CONF + 1]);
+
+		an->anb[0].rx_chainmask = FIELD_GET(GENMASK(5, 3),
+						    an->eeprom_data[MT_EE_WIFI_CONF]);
+		an->anb[1].rx_chainmask = FIELD_GET(GENMASK(5, 3),
+						    an->eeprom_data[MT_EE_WIFI_CONF + 1]);
 		break;
 	case MT7996_DEVICE_ID:
-		/* TODO: handle 4T5R */
-		an->anb[0].chainmask = 0xf;
-		an->anb[1].chainmask = 0xf;
-		an->anb[2].chainmask = 0xf;
-		break;
 	case MT7992_DEVICE_ID:
-		/* TODO: handle BE7200 2i5i 5T5R */
-		an->anb[0].chainmask = 0xf;
-		an->anb[1].chainmask = 0xf;
-		break;
 	case MT7990_DEVICE_ID:
-		an->anb[0].chainmask = 0x3;
-		an->anb[1].chainmask = 0x7;
+		an->anb[0].chainmask = FIELD_GET(GENMASK(5, 3),
+						 an->eeprom_data[MT_EE_WIFI_CONF + 1]);
+		an->anb[1].chainmask = FIELD_GET(GENMASK(2, 0),
+						 an->eeprom_data[MT_EE_WIFI_CONF + 2]);
+		an->anb[2].chainmask = FIELD_GET(GENMASK(5, 3),
+						 an->eeprom_data[MT_EE_WIFI_CONF + 2]);
+
+		an->anb[0].rx_chainmask = FIELD_GET(GENMASK(2, 0),
+						    an->eeprom_data[MT_EE_WIFI_CONF + 3]);
+		an->anb[1].rx_chainmask = FIELD_GET(GENMASK(5, 3),
+						    an->eeprom_data[MT_EE_WIFI_CONF + 3]);
+		an->anb[2].rx_chainmask = FIELD_GET(GENMASK(2, 0),
+						    an->eeprom_data[MT_EE_WIFI_CONF + 4]);
 		break;
+	case MT7999_DEVICE_ID: {
+		int i, conf_offset;
+
+		for (i = 0; i < MAX_BAND_NUM; i++) {
+			conf_offset = MT_EE_WIFI_CONNAC5_CONF(i);
+			an->anb[i].chainmask = FIELD_GET(MT_EE_WIFI_CONNAC5_CONF_TX_PATH,
+							 an->eeprom_data[conf_offset + 1]);
+			an->anb[i].rx_chainmask = FIELD_GET(MT_EE_WIFI_CONNAC5_CONF_RX_PATH,
+							    an->eeprom_data[conf_offset + 1]);
+		}
+
+		break;
+	}
 	default:
 		break;
 	}
@@ -431,9 +465,6 @@ int atenl_eeprom_update_precal(struct atenl *an, int write_offs, int size)
 {
 	u32 offs = an->eeprom_prek_offs;
 	u8 cal_indicator, *eeprom, *pre_cal;
-
-	if (!an->cal && !an->cal_info)
-		return 0;
 
 	eeprom = an->eeprom_data;
 	pre_cal = eeprom + an->eeprom_size;
@@ -599,6 +630,58 @@ out:
 	return 0;
 }
 
+int atenl_eeprom_clear_flash(struct atenl *an)
+{
+	u32 size = EEPROM_PART_SIZE;
+	u32 flash_size, offs;
+	int fd, ret = 0;
+	u8 *buf;
+
+	/* flash_offset = -1 for binfile mode */
+	if (an->flash_part == NULL || !(~an->flash_offset)) {
+		atenl_err("Flash partition or offset is not specified\n");
+		return 0;
+	}
+
+	fd = atenl_mtd_open(an, O_RDWR | O_SYNC);
+	if (fd >= 0)
+		goto clear;
+
+	fd = atenl_mmc_open(an, O_RDWR | O_SYNC);
+	if (fd < 0)
+		goto fail;
+
+clear:
+	flash_size = lseek(fd, 0, SEEK_END);
+	if (size > flash_size)
+		size = flash_size;
+
+	ret = lseek(fd, 0, SEEK_SET);
+	if (ret < 0)
+		goto fail;
+
+	buf = (u8 *)calloc(size, sizeof(char));
+	if (!buf) {
+		perror("calloc");
+		goto fail;
+	}
+
+	ret = write(fd, buf, size);
+	if (ret < 0)
+		goto fail;
+
+	atenl_info("clear flash size 0x%x\n", size);
+	goto out;
+
+fail:
+	atenl_err("Failed to clear flash memory ret = %d\n", ret);
+
+out:
+	free(buf);
+	close(fd);
+	return 0;
+}
+
 /* Directly read values from driver's eeprom.
  * It's usally used to get calibrated data from driver.
  */
@@ -647,6 +730,33 @@ atenl_eeprom_sync_to_driver(struct atenl *an)
 		atenl_nl_write_eeprom(an, i, &an->eeprom_data[i], 16);
 }
 
+static void
+atenl_eeprom_get_cap(struct atenl *an)
+{
+	static const char * const cap_to_radio[] = {
+		[BAND_TYPE_UNUSE] = "invalid",
+		[BAND_TYPE_2G] = "2g",
+		[BAND_TYPE_5G] = "5g",
+		[BAND_TYPE_2G_5G] = "2/5g",
+		[BAND_TYPE_6G] = "6g",
+		[BAND_TYPE_2G_6G] = "2/6g",
+		[BAND_TYPE_5G_6G] = "5/6g",
+		[BAND_TYPE_2G_5G_6G] = "2/5/6g",
+	};
+	int i;
+
+	for (i = 0; i < MAX_BAND_NUM; i++) {
+		struct atenl_band *anb;
+
+		if (!get_band_val(an, i, valid))
+			continue;
+
+		anb = &an->anb[i];
+		atenl_info("band %d: %s radio, tx antenna %x, rx antenna %x\n",
+			   i, cap_to_radio[anb->cap], anb->chainmask, anb->rx_chainmask);
+	}
+}
+
 void atenl_eeprom_cmd_handler(struct atenl *an, u8 phy_idx, char *cmd)
 {
 	an->cmd_mode = true;
@@ -656,6 +766,10 @@ void atenl_eeprom_cmd_handler(struct atenl *an, u8 phy_idx, char *cmd)
 
 	if (!strncmp(cmd, "sync eeprom all", 15)) {
 		atenl_eeprom_write_flash(an);
+	} else if (!strncmp(cmd, "clear eeprom all", 16)) {
+		atenl_eeprom_clear_flash(an);
+	} else if (!strncmp(cmd, "get cap", 7)) {
+		atenl_eeprom_get_cap(an);
 	} else if (!strncmp(cmd, "eeprom", 6)) {
 		char *s = strchr(cmd, ' ');
 
@@ -676,23 +790,43 @@ void atenl_eeprom_cmd_handler(struct atenl *an, u8 phy_idx, char *cmd)
 				atenl_info("Efuse / Default bin mode\n");
 		} else if (!strncmp(s, "set", 3)) {
 			u32 offset, val;
+			char *token;
+			int count;
 
 			s = strchr(s, ' ');
 			if (!s)
 				return;
 			s++;
 
-			if (!sscanf(s, "%x=%x", &offset, &val) ||
-			    offset > EEPROM_PART_SIZE)
+			count = sscanf(s, "%x=", &offset);
+			if (count <= 0 || offset >= an->eeprom_size)
 				return;
 
-			if (offset == 0 || offset == 1) {
-				atenl_info("Modifying chip id is NOT allowed\n");
+			s = strchr(s, '=');
+			if (!s)
 				return;
+			s++;
+
+			token = strtok(s, ",");
+			for (count = 0; token; offset++, count++) {
+				if (offset >= an->eeprom_size) {
+					offset--;
+					count--;
+					break;
+				}
+
+				val = strtoul(token, NULL, 0);
+				if (offset != 0 && offset != 1)
+					an->eeprom_data[offset] = val;
+				token = strtok(NULL, ",");
+				if (!token)
+					break;
 			}
-
-			an->eeprom_data[offset] = val;
-			atenl_info("set offset 0x%x to 0x%x\n", offset, val);
+			if (count)
+				atenl_info("set offsets from 0x%x to 0x%x\n",
+					   offset - count, offset);
+			else
+				atenl_info("set offset 0x%x to 0x%x\n", offset, val);
 		} else if (!strncmp(s, "update buffermode", 17)) {
 			atenl_eeprom_sync_to_driver(an);
 			atenl_nl_update_buffer_mode(an);

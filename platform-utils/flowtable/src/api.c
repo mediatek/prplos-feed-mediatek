@@ -3,6 +3,7 @@
 #include <string.h>
 #include "netfilter_flowtable.h"
 
+#ifdef ATTR_DUMP
 static void attr_dump(struct nfattr *attr)
 {
 	char *data = nla_data(attr);
@@ -16,6 +17,7 @@ static void attr_dump(struct nfattr *attr)
 	}
 	printf("\n");
 }
+#endif
 
 struct ftnl_handle *ftnl_open(void)
 {
@@ -74,20 +76,25 @@ static void build_tuple(struct nlmsghdr *nlh, size_t size,
 	nfnl_nest_end(nlh, nest_proto);
 
 	nfnl_nest_end(nlh, nest_tuple);
-//	attr_dump(nest_tuple);
+#ifdef ATTR_DUMP
+	attr_dump(nest_tuple);
+#endif
 }
 
 int ftnl_flush_table(struct ftnl_handle *h)
 {
-	struct nlmsghdr nlh;
+	union {
+		char buffer[NFNL_HEADER_LEN];
+		struct nlmsghdr nlh;
+	} u;
 	int ret;
 
 	/* construct msg */
-	nfnl_fill_hdr(h->ftnlssh, &nlh, 0, AF_INET, 0,
+	nfnl_fill_hdr(h->ftnlssh, &u.nlh, 0, AF_INET, 0,
 		      FT_MSG_FLUSH, NLM_F_REQUEST | NLM_F_ACK);
 
 	/* send msg */
-	ret = nfnl_send(h->nfnlh, &nlh);
+	ret = nfnl_send(h->nfnlh, &u.nlh);
 	return ret;
 }
 

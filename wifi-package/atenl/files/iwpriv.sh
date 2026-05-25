@@ -6,7 +6,7 @@ full_cmd=$3
 interface_ori=${interface}
 SOC_start_idx="0"
 SOC_end_idx="0"
-is_connac3="0"
+connac_ver="0"
 
 work_mode="RUN" # RUN/PRINT/DEBUG
 iwpriv_file="/tmp/iwpriv_wrapper"
@@ -31,8 +31,12 @@ function do_cmd() {
 
 function print_debug() {
     if [ "${work_mode}" = "DEBUG" ]; then
-        echo "$1"
+        echo "[DEBUG] $1"
     fi
+}
+
+function print_err() {
+    echo "[ERROR] $1"
 }
 
 function write_dmesg() {
@@ -91,74 +95,82 @@ function get_config() {
 function parse_sku {
     SOC_start_idx=$(get_config "STARTIDX" ${interface_file})
     SOC_end_idx=$(get_config "ENDIDX" ${interface_file})
-    is_connac3=$(get_config "IS_CONNAC3" ${interface_file})
+    connac_ver=$(get_config "CONNAC_VER" ${interface_file})
     local eeprom_file=/sys/kernel/debug/ieee80211/phy0/mt76/eeprom
-    if [ -z "${SOC_start_idx}" ] || [ -z "${SOC_end_idx}" ] || [ -z "${is_connac3}" ]; then
+    if [ -z "${SOC_start_idx}" ] || [ -z "${SOC_end_idx}" ] || [ -z "${connac_ver}" ]; then
         if [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7916")" ]; then
             SOC_start_idx="2"
             SOC_end_idx="3"
-            is_connac3="0"
+            connac_ver="2"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7915")" ]; then
             SOC_start_idx="1"
             SOC_end_idx="2"
-            is_connac3="0"
+            connac_ver="2"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7981")" ]; then
             SOC_start_idx="0"
             SOC_end_idx="1"
-            is_connac3="0"
+            connac_ver="2"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7986")" ]; then
             SOC_start_idx="0"
             SOC_end_idx="1"
-            is_connac3="0"
+            connac_ver="2"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7990")" ]; then
             SOC_start_idx="0"
             SOC_end_idx="2"
-            is_connac3="1"
+            connac_ver="3"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7992")" ]; then
             SOC_start_idx="0"
             SOC_end_idx="1"
-            is_connac3="1"
+            connac_ver="3"
         elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "7993")" ]; then
             SOC_start_idx="0"
             SOC_end_idx="1"
-            is_connac3="1"
+            connac_ver="3"
+        elif [ ! -z "$(head -c 2 ${eeprom_file} | hexdump | grep "80f0")" ]; then
+            SOC_start_idx="0"
+            SOC_end_idx="2"
+            connac_ver="5"
         else
             echo "Interface Conversion Failed!"
             echo "Please use iwpriv <phy0/phy1/..> set <...> or configure the sku of your board manually by the following commands"
             echo "For AX3000/AX6000:"
             echo "      echo STARTIDX=0 >> ${interface_file}"
             echo "      echo ENDIDX=1 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=0 >> ${interface_file}"
+            echo "      echo CONNAC_VER=2 >> ${interface_file}"
             echo "For AX7800:"
             echo "      echo STARTIDX=2 >> ${interface_file}"
             echo "      echo ENDIDX=3 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=0 >> ${interface_file}"
+            echo "      echo CONNAC_VER=2 >> ${interface_file}"
             echo "For AX8400:"
             echo "      echo STARTIDX=1 >> ${interface_file}"
             echo "      echo ENDIDX=2 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=0 >> ${interface_file}"
+            echo "      echo CONNAC_VER=2 >> ${interface_file}"
             echo "For Eagle:"
             echo "      echo STARTIDX=0 >> ${interface_file}"
             echo "      echo ENDIDX=2 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=1 >> ${interface_file}"
+            echo "      echo CONNAC_VER=3 >> ${interface_file}"
             echo "For Kite:"
             echo "      echo STARTIDX=0 >> ${interface_file}"
             echo "      echo ENDIDX=1 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=1 >> ${interface_file}"
+            echo "      echo CONNAC_VER=3 >> ${interface_file}"
             echo "For Griffin:"
             echo "      echo STARTIDX=0 >> ${interface_file}"
             echo "      echo ENDIDX=1 >> ${interface_file}"
-            echo "      echo IS_CONNAC3=1 >> ${interface_file}"
+            echo "      echo CONNAC_VER=3 >> ${interface_file}"
+            echo "For Blackhawk:"
+            echo "      echo STARTIDX=0 >> ${interface_file}"
+            echo "      echo ENDIDX=2 >> ${interface_file}"
+            echo "      echo CONNAC_VER=5 >> ${interface_file}"
             exit 0
         fi
         record_config "STARTIDX" ${SOC_start_idx} ${interface_file}
         record_config "ENDIDX" ${SOC_end_idx} ${interface_file}
-        record_config "IS_CONNAC3" ${is_connac3} ${interface_file}
+        record_config "CONNAC_VER" ${connac_ver} ${interface_file}
     fi
 }
 
 function convert_interface {
-    if [ ${is_connac3} == "0" ]; then
+    if [ ${connac_ver} == "2" ]; then
         if [[ $1 == "raix"* ]]; then
             phy_idx=1
         elif [[ $1 == "rai"* ]]; then
@@ -187,7 +199,7 @@ function convert_interface {
             fi
         fi
     else
-        # Connac 3 chips has different mapping method
+        # Connac 3/5 chips has different mapping method
         # phy0: ra0
         # phy1: rai0
         # phy2: rax0
@@ -328,7 +340,7 @@ function convert_gi {
                     he_ltf="2"
                     ;;
                 *)
-                    echo "unknown gi"
+                    print_err "unknown gi"
             esac
             ;;
         "he_mu")
@@ -348,7 +360,7 @@ function convert_gi {
                     he_ltf="2"
                     ;;
                 *)
-                    echo "unknown gi"
+                    print_err "unknown gi"
             esac
             ;;
         "he_tb")
@@ -365,11 +377,11 @@ function convert_gi {
                     he_ltf="2"
                     ;;
                 *)
-                    echo "unknown gi"
+                    print_err "unknown gi"
             esac
             ;;
         *)
-            print_debug "legacy mode no need gi"
+            print_err "legacy mode no need gi"
     esac
 
     do_cmd "mt76-test ${interface} set tx_rate_sgi=${sgi} tx_ltf=${he_ltf}"
@@ -458,7 +470,7 @@ function convert_channel {
             elif [ "${temp}" == "6" ]; then
                 local band=2
             else
-                echo "iwpriv wrapper band translate error!"
+                print_err "wrapper band translate error!"
             fi
         else
             # mt7915 in AX8400 case: band should be determined by only the input band
@@ -731,7 +743,7 @@ function convert_ibf {
         do_cmd "mt76-test phy${phy_idx} set state=tx_frames"
     elif [ "${cmd}" = "ATEConTxETxBfInitProc" ]; then
         local wlan_idx="1"
-        if [ ${is_connac3} == "1" ]; then
+        if [ ${connac_ver} != "2" ]; then
             local wlan_idx=$((phy_idx+1))
         fi
         do_cmd "mt76-test phy${phy_idx} set aid=1"
@@ -739,7 +751,7 @@ function convert_ibf {
         do_cmd "mt76-test phy${phy_idx} set txbf_act=update_ch txbf_param=1"
         do_cmd "mt76-test phy${phy_idx} set txbf_act=ebf_prof_update txbf_param=0,0,0"
         do_cmd "mt76-test phy${phy_idx} set txbf_act=apply_tx txbf_param=${wlan_idx},1,0,0,0"
-        if [ ${is_connac3} == "1" ]; then
+        if [ ${connac_ver} != "2" ]; then
             do_cmd "mt76-test phy${phy_idx} set txbf_act=txcmd txbf_param=1,1,1"
         fi
         do_cmd "mt76-test phy${phy_idx} set txbf_act=pfmu_tag_read txbf_param=0,1"
@@ -829,8 +841,8 @@ function do_ate_work() {
             local if_str=$(ifconfig | grep mon${phy_idx})
 
             if [ ! -z "${if_str}" -a "${if_str}" != " " ]; then
-                echo "ATE already starts."
-            elif [ ${is_connac3} == "1" ]; then
+                print_debug "ATE already starts."
+            elif [ ${connac_ver} != "2" ]; then
                 do_cmd "mt76-test phy${phy_idx} add mon${phy_idx}"
             else
                 do_cmd "iw phy ${interface} interface add mon${phy_idx} type monitor"
@@ -879,8 +891,8 @@ function do_ate_work() {
             local if_str=$(ifconfig | grep mon${phy_idx})
 
             if [ -z "${if_str}" -a "${if_str}" != " " ]; then
-                echo "ATE does not start."
-            elif [ ${is_connac3} == "1" ]; then
+                print_debug "ATE does not start."
+            elif [ ${connac_ver} != "2" ]; then
                 do_cmd "mt76-test phy${phy_idx} del mon${phy_idx}"
             else
                 do_cmd "mt76-test ${interface} set state=off"
@@ -949,7 +961,7 @@ function do_ate_work() {
         "TXFRAME")
             do_cmd "mt76-test ${interface} set state=tx_frames"
             ;;
-        "TXSTOP"|"RXSTOP")
+        "TXSTOP"|"RXSTOP"|"TXCONTSTOP")
             do_cmd "mt76-test ${interface} set state=idle"
             ;;
         "TXREVERT")
@@ -996,7 +1008,7 @@ function do_ate_work() {
             do_cmd "atenl -i ${interface} -c \"eeprom rx gain sync\""
             ;;
         *)
-            print_debug "skip ${ate_cmd}"
+            print_err "Unknown cmd: ${ate_cmd}"
             ;;
     esac
 }
@@ -1071,7 +1083,7 @@ function convert_listmode {
             do_cmd "mt76-test ${interface} set list_act=switch_seg"
             ;;
         *)
-            print_debug "skip ${tag}"
+            print_err "Unknown tag: ${tag}"
             ;;
     esac
 }
@@ -1146,7 +1158,6 @@ fi
 
 cmd=$(echo ${full_cmd} | sed s/=/' '/g | cut -d " " -f 1)
 param=$(echo ${full_cmd} | sed s/=/' '/g | cut -d " " -f 2)
-mld=$(iw dev | grep 'link ID')
 
 if [ "${cmd_type}" = "set" ]; then
     skip=0
@@ -1157,32 +1168,33 @@ if [ "${cmd_type}" = "set" ]; then
         "csi"|"amnt"|"ap_rfeatures"|"ap_wireless"|"mu"|"set_muru_manual_config")
             cert_cmd="$*"
 
-	    if [ ! -z "$mld" ]; then
-		    mld_interface=$(iw dev | grep Interface | awk '{print $2}' | tail -n1)
-		    if [ $cmd == "ap_rfeatures" ] || [ "$cmd" == "ap_wireless" ]; then
+            # FIXME: this line takes approximately 0.08 to 0.1 sec in kerenl 6.6
+            mld=$(iw dev | grep 'link ID')
+            if [ ! -z "$mld" ]; then
+                mld_interface=$(iw dev | grep Interface | awk '{print $2}' | tail -n1)
+                if [ $cmd == "ap_rfeatures" ] || [ "$cmd" == "ap_wireless" ]; then
 
-			    band_number=$(echo "$cert_cmd" | grep -o 'band[0-9]*')
+                    band_number=$(echo "$cert_cmd" | grep -o 'band[0-9]*')
 
-			    links_info_base="/sys/kernel/debug/ieee80211/phy0/netdev"
-			    links_info_intf="${mld_interface}/mt76_links_info"
-			    links_info_cmd="${links_info_base}:${links_info_intf}"
+                    links_info_base="/sys/kernel/debug/ieee80211/phy0/netdev"
+                    links_info_intf="${mld_interface}/mt76_links_info"
+                    links_info_cmd="${links_info_base}:${links_info_intf}"
 
-			    band_link_id_info=$(
-			    	cat "$links_info_cmd" | grep "${band_number}_link_id"
-			    )
-			    band_link_id=$(
-			    	echo "$band_link_id_info" | awk -F'=' '{print $2}' | tr -d ' '
-			    )
+                    band_link_id_info=$(
+                        cat "$links_info_cmd" | grep "${band_number}_link_id"
+                    )
+                    band_link_id=$(
+                        echo "$band_link_id_info" | awk -F'=' '{print $2}' | tr -d ' '
+                    )
 
-			    cmd_w_link_id=$(echo $* | sed "s/band[0-9]/& -l ${band_link_id}/g")
-			    cert_cmd=${cmd_w_link_id}
+                    cmd_w_link_id=$(echo $* | sed "s/band[0-9]/& -l ${band_link_id}/g")
+                    cert_cmd=${cmd_w_link_id}
+                fi
+                ## convert bandX to mld interface name
+                cert_cmd="$(echo ${cert_cmd} | sed 's/band[0-9]/${mld_interface}/')"
+            fi
 
-		    fi
-		    ## convert bandX to mld interface name
-		    cert_cmd="$(echo ${cert_cmd} | sed 's/band[0-9]/${mld_interface}/')"
-	    fi
-
-            if [ ${is_connac3} == "1" ]; then
+            if [ ${connac_ver} != "2" ]; then
                 hostapd_cmd="$(echo $cert_cmd | sed 's/set/raw/')"
                 do_cmd "hostapd_cli -i $hostapd_cmd"
             else
@@ -1215,7 +1227,7 @@ if [ "${cmd_type}" = "set" ]; then
         "ATEPKTTXTIME"|"ATEIPG"|"ATEDUTYCYCLE"|"ATETXFREQOFFSET")
             cmd_new=$(simple_convert ${cmd})
             if [ "${param_new}" = "undefined" ]; then
-                echo "unknown cmd: ${cmd}"
+                print_err "unknown cmd: ${cmd}"
                 exit
             fi
             param_new=${param}
@@ -1228,7 +1240,7 @@ if [ "${cmd_type}" = "set" ]; then
             param_new=${param}
             ;;
         "ATETXGI")
-            if [ ${is_connac3} == "0" ]; then
+            if [ ${connac_ver} == "2" ]; then
                 tx_mode=$(convert_tx_mode $(get_config "ATETXMODE" ${iwpriv_file}))
                 convert_gi ${tx_mode} ${param}
                 skip=1
@@ -1241,8 +1253,8 @@ if [ "${cmd_type}" = "set" ]; then
             cmd_new="tx_rate_mode"
             param_new=$(convert_tx_mode ${param})
             if [ "${param_new}" = "undefined" ]; then
-                echo "unknown tx mode"
-                echo "0:cck, 1:ofdm, 2:ht, 4:vht, 8:he_su, 9:he_er, 10:he_tb, 11:he_mu"
+                print_err "unknown tx mode"
+                print_debug "0:cck, 1:ofdm, 2:ht, 4:vht, 8:he_su, 9:he_er, 10:he_tb, 11:he_mu"
                 exit
             else
                 record_config ${cmd} ${param} ${iwpriv_file}
@@ -1315,7 +1327,7 @@ if [ "${cmd_type}" = "set" ]; then
             skip=1
             ;;
         *)
-            print_debug "Unknown command to set: ${cmd}"
+            print_err "Unknown command to set: ${cmd}"
             skip=1
     esac
 
@@ -1419,18 +1431,19 @@ elif [ "${cmd_type}" = "switch" ]; then
     eeprom_testmode_offset="1af"
     testmode_enable="0"
 
-    if [ ${is_connac3} == "0" ]; then
+    if [ ${connac_ver} == "2" ]; then
         return
     fi
 
     if [ "${cmd}" = "testmode" ]; then
         testmode_enable="1"
         do_cmd "wifi down"
-        do_cmd "uci set wireless.radio0.disabled=1"
-        do_cmd "uci set wireless.radio1.disabled=1"
-        do_cmd "uci set wireless.radio2.disabled=1"
-        do_cmd "uci commit"
     fi
+
+    do_cmd "uci set wireless.radio0.disabled=${testmode_enable}"
+    do_cmd "uci set wireless.radio1.disabled=${testmode_enable}"
+    do_cmd "uci set wireless.radio2.disabled=${testmode_enable}"
+    do_cmd "uci commit"
 
     if [ "${eeprom_mode}" = "flash" ]; then
         ## flash mode should set eeprom testmode offset bit
@@ -1457,5 +1470,5 @@ elif [ "${cmd_type}" = "switch" ]; then
     do_cmd "killall hostapd"
     do_cmd "killall netifd"
 else
-    echo "Unknown command"
+    print_err "Unknown command type"
 fi

@@ -17,9 +17,6 @@
 				spi-max-frequency = <52000000>;
 				spi-tx-bus-width = <4>;
 				spi-rx-bus-width = <4>;
-				mediatek,nmbm;
-				mediatek,bmt-max-ratio = <1>;
-				mediatek,bmt-max-reserved-blocks = <64>;
 
 				partitions {
 					compatible = "fixed-partitions";
@@ -28,51 +25,58 @@
 
 					partition@0 {
 						label = "BL2";
-						reg = <0x00000 0x0100000>;
+						reg = <0x00000 0x0200000>;
 						read-only;
 					};
 
-					partition@100000 {
-						label = "u-boot-env";
-						reg = <0x0100000 0x0080000>;
-					};
-
-					factory: partition@180000 {
-						label = "Factory";
-						reg = <0x180000 0x0400000>;
-
-						nvmem-layout {
-							compatible = "fixed-layout";
-							#address-cells = <1>;
-							#size-cells = <1>;
-
-							gmac2_mac: eeprom@fffee {
-								reg = <0xfffee 0x6>;
-							};
-
-							gmac1_mac: eeprom@ffffa {
-								reg = <0xffffa 0x6>;
-							};
-
-							gmac0_mac: eeprom@ffff4 {
-								reg = <0xffff4 0x6>;
-							};
-						};
-					};
-
-					partition@580000 {
-						label = "FIP";
-						reg = <0x580000 0x0200000>;
-					};
-
-					partition@780000 {
+					partition@200000 {
 						label = "ubi";
-						reg = <0x780000 0x7080000>;
+						reg = <0x0200000 0x7e00000>;
 						compatible = "linux,ubi";
 
 						volumes {
-							ubi_rootfs: ubi-volume-fit {
-								volname = "firmware";
+							ubi-volume-ubootenv {
+								volname = "ubootenv";
+								nvmem-layout {
+									compatible = "u-boot,env-redundant-bool";
+								};
+							};
+
+							ubi-volume-ubootenv2 {
+								volname = "ubootenv2";
+								nvmem-layout {
+									compatible = "u-boot,env-redundant-bool";
+								};
+							};
+
+							ubi_factory: ubi-volume-factory {
+								volname = "factory";
+
+								nvmem-layout {
+									compatible = "fixed-layout";
+									#address-cells = <1>;
+									#size-cells = <1>;
+
+									eeprom_wmac: eeprom@0 {
+										reg = <0x0 0x1e00>;
+									};
+
+									gmac2_mac: eeprom@fffee {
+										reg = <0xfffee 0x6>;
+									};
+
+									gmac1_mac: eeprom@ffffa {
+										reg = <0xffffa 0x6>;
+									};
+
+									gmac0_mac: eeprom@ffff4 {
+										reg = <0xffff4 0x6>;
+									};
+								};
+							};
+
+							ubi_root: ubi-volume-fit {
+								volname = "fit";
 							};
 						};
 					};
@@ -84,7 +88,7 @@
 	fragment@1 {
 		target-path = "/chosen";
 		__overlay__ {
-			rootdisk-spim-nand = <&ubi_rootfs>;
+			rootdisk-spim-nand = <&ubi_root>;
 		};
 	};
 
@@ -94,11 +98,11 @@
 			slot0: pcie@0,0 {
 				reg = <0x0000 0 0 0 0>;
 
-				mt7996@0,0 {
+				wifi@0,0 {
 					compatible = "mediatek,mt76";
 					reg = <0x0000 0 0 0 0>;
-					device_type = "pci";
-					mediatek,mtd-eeprom = <&factory 0x0>;
+					nvmem-cell-names = "eeprom";
+					nvmem-cells = <&eeprom_wmac>;
 				};
 			};
 		};

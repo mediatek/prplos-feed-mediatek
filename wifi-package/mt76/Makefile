@@ -1,16 +1,16 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mt76
-PKG_RELEASE=1
+PKG_RELEASE=2
 
-PKG_LICENSE:=GPLv2
+PKG_LICENSE:=BSD-3-Clause-Clear
 PKG_LICENSE_FILES:=
 
 PKG_SOURCE_URL:=https://github.com/openwrt/mt76
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2025-04-11
-PKG_SOURCE_VERSION:=be28ef77e330fdee28054214c798f028ddfbbc02
-PKG_MIRROR_HASH:=b555d579345d9c6870740d3b51a12b66d4f9a584f8f9d131e3153a2a366bd7ec
+PKG_SOURCE_DATE:=2026-03-05
+PKG_SOURCE_VERSION:=9f95baf93a070692ed922a2fc57ef8bfde801c84
+PKG_MIRROR_HASH:=eaca371ec6f8d0f089d098a3f7fc8c5819aea090e05f4f3d9e8a9b2a2d4f2ff8
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 PKG_USE_NINJA:=0
@@ -41,7 +41,8 @@ define KernelPackage/mt76-default
   DEPENDS:= \
 	+kmod-mac80211 \
 	+@DRIVER_11AC_SUPPORT \
-	+@KERNEL_PAGE_POOL
+	+@KERNEL_PAGE_POOL \
+	@!TARGET_uml
 endef
 
 define KernelPackage/mt76
@@ -237,6 +238,7 @@ define KernelPackage/mt7915e
   DEPENDS+=@PCI_SUPPORT +kmod-mt76-connac +kmod-hwmon-core +kmod-thermal +@DRIVER_11AX_SUPPORT +@KERNEL_RELAY
   FILES:= $(PKG_BUILD_DIR)/mt7915/mt7915e.ko
   AUTOLOAD:=$(call AutoProbe,mt7915e)
+  MODPARAMS.mt7915e:=wed_enable=1
 endef
 
 define KernelPackage/mt7916-firmware
@@ -506,6 +508,12 @@ ifdef CONFIG_PACKAGE_kmod-mt7921e
 endif
 ifdef CONFIG_PACKAGE_kmod-mt7996e
   PKG_MAKE_FLAGS += CONFIG_MT7996E=m
+  ifdef CONFIG_TARGET_airoha_an7581
+    PKG_MAKE_FLAGS += CONFIG_MT76_NPU=y
+    PKG_MAKE_FLAGS += CONFIG_MT7996_NPU=y
+    NOSTDINC_FLAGS += -DCONFIG_MT76_NPU
+    NOSTDINC_FLAGS += -DCONFIG_MT7996_NPU
+  endif
 endif
 ifdef CONFIG_PACKAGE_kmod-mt7925-common
   PKG_MAKE_FLAGS += CONFIG_MT7925_COMMON=m
@@ -518,7 +526,7 @@ ifdef CONFIG_PACKAGE_kmod-mt7925e
 endif
 
 PKG_YEAR:=$(shell echo $(PKG_SOURCE_DATE) | cut -d'-' -f1 | cut -c3-4)
-PKG_MONTH:=$(shell echo $(PKG_SOURCE_DATE) | cut -d'-' -f2)
+PKG_MONTH:=$(shell echo $(PKG_SOURCE_DATE) | cut -d'-' -f2 | sed 's/^0*//')
 ADDITIONAL_CFLAGS=-DPKG_YEAR=$(PKG_YEAR) -DPKG_MONTH=$(PKG_MONTH)
 
 define Build/Compile

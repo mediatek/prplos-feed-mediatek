@@ -17,7 +17,7 @@ define Package/smp_util
   SECTION:=net
   CATEGORY:=Network
   TITLE:=mtk smp utility
-  VERSION:=$(PKG_RELEASE)-$(REVISION)
+  VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 endef
 
 define Package/smp_util/description
@@ -37,10 +37,13 @@ define Package/smp_util/install
 	$(INSTALL_DIR) $(1)/sbin
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
 
+	$(INSTALL_BIN) ./files/flowtable.sh $(1)/sbin/
 	$(INSTALL_BIN) ./files/smp-mt76.sh $(1)/sbin/
 	$(INSTALL_BIN) ./files/smp.init $(1)/etc/init.d/smp
 	$(INSTALL_BIN) ./files/99-smp $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/99-flowtable_update $(1)/etc/hotplug.d/net
 endef
 
 $(eval $(call BuildPackage,smp_util))

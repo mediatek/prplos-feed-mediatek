@@ -1,0 +1,223 @@
+#!/bin/sh
+# Usage:
+# - enable: ./mt76_sns_dump.sh &
+# - disable: killall mt76_sns_dump.sh
+
+do_cmd() {
+    local cmd="$1"
+
+    echo "[cmd] $cmd"
+    eval $cmd
+    echo ""
+}
+
+dump_board_info() {
+    # get bootfile name
+    part=$(cat /proc/mtd | grep "u-boot-env" | cut -d ":" -f 1)
+    part_size=$(cat /proc/mtd | grep "u-boot-env" | cut -d " " -f 3)
+    echo "/dev/${part} 0x0000 0x20000 0x${part_size}" > /etc/fw_env.config
+    do_cmd "fw_printenv bootfile"
+
+    do_cmd "uname -a"
+    do_cmd "lspci"
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/fw_version"
+    do_cmd "cat /etc/config/wireless"
+    do_cmd "cat /etc/config/network"
+    do_cmd "iw dev"
+    do_cmd "/sbin/mtk_factory_rw.sh -r wan"
+}
+
+dump_link_sta_info() {
+    local phy="/sys/kernel/debug/ieee80211/phy0"
+
+    iw dev | awk '
+    $1 == "Interface" {iface=$2}
+    $1 == "type" {print iface, $2}
+    ' | while read iface type; do
+        [ "$type" = "AP" ] || continue
+
+        local base="${phy}/netdev:${iface}"
+        [ -d "$base" ] || { echo "[skip] ${base} not found"; continue; }
+
+        local sta_dir="${base}/stations"
+        [ -d "$sta_dir" ] || { echo "[skip] ${sta_dir} not found"; continue; }
+
+        for s in "${sta_dir}"/*; do
+            [ -d "$s" ] || continue
+            local mac
+            mac="$(basename "$s")"
+
+            for f in "$s"/link-*/link_sta_info "$s"/link_sta_info; do
+                [ -f "$f" ] || continue
+                parent="$(basename "$(dirname "$f")")"
+                case "$parent" in
+                    link-*)
+                        echo "=== iface:${iface} mac:${mac} ${parent} ==="
+                        ;;
+                    *)
+                        echo "=== iface:${iface} mac:${mac} (single-link) ==="
+                        ;;
+                esac
+                do_cmd "cat '$f'"
+                echo ""
+            done
+        done
+    done
+}
+
+dump_mt76_links_info() {
+    local phy="/sys/kernel/debug/ieee80211/phy0"
+
+    [ -d "$phy" ] || { echo "[error] $phy not found"; return; }
+
+    for f in "$phy"/*/mt76_links_info; do
+        [ -f "$f" ] || continue
+        local rel="${f#$phy/}"
+        echo "$rel"
+        do_cmd "cat '$f'"
+        echo ""
+    done
+}
+
+dump_connection_info() {
+    iw dev | awk '
+    $1 == "Interface" {iface=$2}
+    $1 == "type" {print iface, $2}
+    ' | while read iface type; do
+    if [ "$type" = "AP" ]; then
+        count=$(iw dev "$iface" station dump | grep Station | wc -l)
+        echo -e "\033[1m$iface (AP): $count clients\033[0m"
+        hostapd_cli -i "$iface" get_disconn_counter
+    elif [ "$type" = "STA" ]; then
+        echo -e "\033[1m$iface (STA):\033[0m"
+        iw dev "$iface" link
+    else
+        echo "$iface ($type): Skip"
+    fi
+    done
+}
+
+dump_token_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/token"
+}
+
+dump_ple_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/ple_info"
+}
+
+dump_pse_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/pse_info"
+}
+
+dump_mib_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/*/mibinfo"
+}
+
+dump_drop_stats() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/tx_drop_stats"
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/rx_drop_stats"
+}
+
+dump_tr_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/tr_info"
+}
+
+dump_twt_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/twt_stats"
+}
+
+dump_ser_status() {
+    do_cmd "echo 0 > /sys/kernel/debug/ieee80211/phy0/mt76/band0/sys_recovery" # FW
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/band0/sys_recovery" # Driver
+}
+
+dump_sta_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/sta_info"
+}
+
+dump_wm_info() {
+    do_cmd "cat /sys/kernel/debug/ieee80211/phy0/mt76/fw_wm_info"
+}
+
+dump_wed_rxinfo() {
+    do_cmd "cat /sys/kernel/debug/wed0/rxinfo"
+    do_cmd "cat /sys/kernel/debug/wed1/rxinfo" #Eagle
+}
+
+dump_wed_txinfo() {
+    do_cmd "cat /sys/kernel/debug/wed0/txinfo"
+    do_cmd "cat /sys/kernel/debug/wed1/txinfo" #Eagle
+}
+
+dump_wed_cfg() {
+    do_cmd "cat /sys/kernel/debug/wed0/cfg"
+    do_cmd "cat /sys/kernel/debug/wed1/cfg" #Eagle
+}
+
+per_10_min_work() {
+    dump_connection_info
+    dump_sta_info
+
+    local i=0
+    local max=3
+    while [ $i -lt $max ]
+    do
+        dump_token_info
+        dump_ple_info
+        dump_pse_info
+        dump_mib_info
+        dump_tr_info
+        dump_wed_rxinfo
+        dump_wed_txinfo
+
+        true $(( i++ ))
+        sleep 1
+    done
+}
+
+per_30_min_work() {
+    dump_drop_stats
+    dump_twt_info
+    dump_ser_status
+    dump_link_sta_info
+}
+
+per_60_min_work() {
+    dump_mt76_links_info
+
+    local i=0
+    local max=2
+    while [ $i -lt $max ]
+    do
+        dump_wm_info
+	dump_wed_cfg
+
+        true $(( i++ ))
+        sleep 1
+    done
+}
+
+counter=0
+
+dump_board_info
+
+while true; do
+    echo "===== $(date '+%Y-%m-%d %H:%M:%S') ====="
+    # works for every 10-minute
+    per_10_min_work
+
+    # works for every 30-minute
+    if [ $(( $counter % 3 )) -eq "0" ]; then
+        per_30_min_work
+    fi
+
+    # works for every 60-minute
+    if [ $(( $counter % 6 )) -eq "0" ]; then
+        per_60_min_work
+    fi
+
+    echo ""
+    sleep 600
+
+    counter=$(( (counter + 1) ))
+done

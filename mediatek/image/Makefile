@@ -33,16 +33,20 @@ define Device/Default
 	pad-rootfs | append-metadata
 endef
 
-# build fw-ar-ver
-get_fw_ar_ver = \
-  $(if $(wildcard $(2)),$(shell rm -rf $(2))) \
-  $(if $(wildcard $(1)),$(info $(shell $(STAGING_DIR_HOST)/bin/ar-tool fw_ar_table create_ar_conf $(1) $(2)))) \
-  $(if $(wildcard $(2)),$(eval include $(2))) \
-  $(if $(FW_AR_VER),$(info FW_AR_VER = $(FW_AR_VER)),$(error Firmware anti-rollback version not found))
+define Build/asus-trx
+	$(STAGING_DIR_HOST)/bin/asusuimage $(wordlist 1,$(words $(1)),$(1)) -i $@ -o $@.new
+	mv $@.new $@
+endef
 
-define Image/fw-ar-ver
-	$(call get_fw_ar_ver,$(TOPDIR)/$(call qstrip,$(CONFIG_ANTI_ROLLBACK_TABLE)), \
-			     $(TOPDIR)/$(call qstrip,$(CONFIG_AUTO_AR_CONF)))
+define Image/get_fw_ar_ver
+	$(shell sed -n 's/^FW_AR_VER\t:=\t*//p' $(TOPDIR)/$(call qstrip,$(CONFIG_AUTO_AR_CONF)))
+endef
+
+define Image/gen-fw-ar-ver
+	rm -rf $(TOPDIR)/$(call qstrip,$(CONFIG_AUTO_AR_CONF))
+	$(STAGING_DIR_HOST)/bin/ar-tool fw_ar_table create_ar_conf \
+		$(TOPDIR)/$(call qstrip,$(CONFIG_ANTI_ROLLBACK_TABLE)) \
+		$(TOPDIR)/$(call qstrip,$(CONFIG_AUTO_AR_CONF))
 endef
 
 include $(SUBTARGET).mk
@@ -53,14 +57,14 @@ define Image/Build
 endef
 
 define Build/append-opteenode
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb "/reserved-memory/secmon@43000000" \
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb "/reserved-memory/secmon@43000000" \
 		-tx reg 0 0x43000000 0 $(shell printf "%#x" $$((0x570000 \
 		$(if $(CONFIG_OPTEE_CORE_RESERVED_SHMEM),+ $(CONFIG_OPTEE_RESERVED_SHMEM_SIZE),))))
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware -cp
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -cp
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts compatible "linaro,optee-tz"
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts method "smc"
-	fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts status "okay"
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware -cp
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -cp
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts compatible "linaro,optee-tz"
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts method "smc"
+	$(STAGING_DIR_HOSTPKG)/bin/fdtput $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb /firmware/optee -ts status "okay"
 endef
 
 # build squashfs-hashed
@@ -68,7 +72,6 @@ define Build/squashfs-hashed
 	$(TOPDIR)/scripts/make-squashfs-hashed.sh \
 		$(ROOTFS/$(FILESYSTEMS)/$(DEVICE_NAME)) \
 		$(STAGING_DIR_HOSTPKG) \
-		$(TOPDIR) \
 		$(ROOTFS/$(FILESYSTEMS)/$(DEVICE_NAME))-hashed-summary
 	fdt-patch-dm-verify $(ROOTFS/$(FILESYSTEMS)/$(DEVICE_NAME))-hashed-summary \
 		$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb $(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb

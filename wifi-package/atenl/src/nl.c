@@ -1390,7 +1390,6 @@ static int atenl_nl_precal_sync_from_driver_cb(struct nl_msg *msg, void *arg)
 	struct nlattr *attr, *cur;
 	int i, rem, prek_offset = nl_priv->attr;
 
-
 	attr = unl_find_attr(&nl_priv->unl, msg, NL80211_ATTR_TESTDATA);
 	if (!attr)
 		return NL_SKIP;
@@ -1526,7 +1525,7 @@ start:
 		}
 
 		ret = atenl_nl_precal_sync_partition(&nl_priv, MT76_TM_ATTR_PRECAL_INFO, 0, 0);
-		if (ret || !an->cal_info)
+		if (ret)
 			goto out;
 
 		group_size = an->cal_info[0];
@@ -1569,15 +1568,19 @@ start:
 		ret = atenl_eeprom_update_precal(an, base, size);
 		break;
 	case PREK_CLEAN_GROUP:
-		if (!(cal_indicator & group_ind_mask))
+		if (!(cal_indicator & group_ind_mask) || !an->cal_info[0]) {
+			atenl_err("No available group precal data to clean\n");
 			return 0;
-		an->cal_info[4] = cal_indicator & group_ind_mask;
+		}
+		an->cal_info[4] = cal_indicator & ~group_ind_mask;
 		ret = atenl_eeprom_update_precal(an, 0, group_size);
 		break;
 	case PREK_CLEAN_DPD:
-		if (!(cal_indicator & dpd_ind_mask))
+		if (!(cal_indicator & dpd_ind_mask) || !an->cal_info[1]) {
+			atenl_err("No available DPD precal data to clean\n");
 			return 0;
-		an->cal_info[4] = cal_indicator & dpd_ind_mask;
+		}
+		an->cal_info[4] = cal_indicator & ~dpd_ind_mask;
 		ret = atenl_eeprom_update_precal(an, group_size, dpd_size);
 		break;
 	default:
