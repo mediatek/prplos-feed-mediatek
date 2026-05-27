@@ -44,6 +44,10 @@ config DRIVER_11BE_SUPPORT
 	bool
 	default n
 
+config DRIVER_11BN_SUPPORT
+	bool
+	default n
+
 config WPA_ENABLE_WEP
 	bool "Enable support for unsecure and obsolete WEP"
 	depends on PACKAGE_hostapd-common
