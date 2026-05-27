@@ -18,7 +18,7 @@ index c3a804b..0869e03 100644
 -    uri: https://gitlab.com/prpl-foundation/prplos/feeds/feed-mediatek
 -    revision: main@01168987a83609022d7da648435f1f4db7a95c14
 +    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
-+    tracking_branch: prplos-4.1
++    tracking_branch: master
 +    revision: # <need to replace with commit hash>
 +
 +additional_packages:
