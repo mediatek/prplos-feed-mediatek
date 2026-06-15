@@ -42,14 +42,14 @@ Additional patches need to be applied.
 **0007-set-numeric-owner-and-group-to-root.patch**
 - Fix checkout source fail when download tarball from internet fail 
 ```
-git clone https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek -b prplos-4.1
+git clone https://github.com/mediatek/prplos-feed-mediatek -b main
 for patch in prplos-feed-mediatek/autobuild/prplos/patches/*.patch; do patch -p1 < "$patch"; done
 ```
 
 #### 3. Update the mtk_filogic.yml File
 Select the fixed revision or just to follow the latest revision, execute the following command:
 ```
-sed -i "s/revision: .*/revision: $(git ls-remote https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek refs/heads/prplos-4.1 | awk '{print $1}')/" ./profiles/mtk_filogic.yml
+sed -i "s/revision: .*/revision: $(git ls-remote https://github.com/mediatek/prplos-feed-mediatek refs/heads/main | awk '{print $1}')/" ./profiles/mtk_filogic.yml
 ```
 
 This command retrieves the latest commit hash from the master branch of the specified remote repository and updates the revision field in the mtk_filogic.yml file accordingly.
@@ -65,8 +65,8 @@ You should see an output similar to the following, indicating the new revision:
 ```bash
 feeds:
   - name: feed_mediatek
-    uri: https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek
-    tracking_branch: prplos-4.1
+    uri: https://github.com/mediatek/prplos-feed-mediatek
+    tracking_branch: main
     revision: e3369a85405b1e951c462b26f851389fce807b40
 ```
 
@@ -122,8 +122,8 @@ These can be used to upgrade the image on your target using uboot or sysupgrade.
 ### Release History
 | Date       | OpenWrt Source   |
 |------------|------------------|
-| 2026.03.25 | Sync from [OpenWrt WiFi7 MP4.3 Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/Readme-6.12.md#wi_fi-7-latest-release-version) |
-| 2025.09.23 | Sync from [OpenWrt WiFi7 MP4.2 Release](https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds/+/refs/heads/master/autobuild/unified/#filogic-880_860_850-wifi7-mp4_2-release-2025_09_12) |
+| 2026.03.25 | Sync from [OpenWrt WiFi7 MP4.3 Release](https://github.com/mediatek/mtk-openwrt-feeds/blob/main/autobuild/unified/Readme-6.12.md#wi-fi-7-latest-release-version) |
+| 2025.09.23 | Sync from [OpenWrt WiFi7 MP4.2 Release](https://github.com/mediatek/mtk-openwrt-feeds/blob/main/autobuild/unified/Readme-6.6.md#wi-fi-7-latest-release-version) |
 
 ## pWHM Version status
 | pWHM version | Status |

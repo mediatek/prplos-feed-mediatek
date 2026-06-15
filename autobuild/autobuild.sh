@@ -88,8 +88,8 @@ mtk_secure_prepare() {
 
 change_feed_mtk_revision() {
     echo -e "\033[1;32m === Hack feed_mtk to latest revision... ===\033[0m"
-    REPO_URL="https://git01.mediatek.com/filogic/prolos/prplos-feed-mediatek"
-    BRANCH="master"
+    REPO_URL="https://github.com/mediatek/prplos-feed-mediatek"
+    BRANCH="main"
     YAML_FILE="profiles/mtk_filogic.yml"
 
     # Get the latest commit hash from the specified branch
