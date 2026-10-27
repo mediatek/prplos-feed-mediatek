@@ -5,13 +5,14 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=hostapd
-PKG_RELEASE:=1
+PKG_RELEASE:=6
 
-PKG_SOURCE_URL:=https://w1.fi/hostap.git
+PKG_SOURCE_URL:=https://github.com/mediatek/softmac_hostapd
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2026-02-19
-PKG_SOURCE_VERSION:=53d12cd44da765ee446b2834aad92e9670319f8c
-PKG_MIRROR_HASH:=dc99b4211e9ed3037fad88c4052d90da11b404aa8e2110e1a85059a23a81833d
+PKG_SOURCE_VERSION:=mp4.3-6.12
+PKG_MIRROR_HASH:=skip
+
+PKG_VERSION:=4.3.6.12
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 PKG_LICENSE:=BSD-3-Clause
@@ -110,7 +111,7 @@ DRIVER_MAKEOPTS= \
 	CONFIG_SAE_PK=y CONFIG_TESTING_OPTIONS=y CONFIG_WPS=y CONFIG_WPS_UPNP=y \
 	CONFIG_DPP=y CONFIG_DPP2=y CONFIG_DPP3=y \
 	CONFIG_HS20=y CONFIG_P2P_MANAGER=y \
-	CONFIG_HE_OVERRIDES=y CONFIG_EHT_OVERRIDES=y \
+	CONFIG_HE_OVERRIDES=y CONFIG_EHT_OVERRIDES=y CONFIG_DEBUG_FILE=y \
 	$(if $(HOSTAPD_IEEE80211BE),CONFIG_OCV=y)
 
 
@@ -754,13 +755,11 @@ endif
 
 define Install/hostapd
 	$(INSTALL_DIR) $(1)/usr/sbin $(1)/usr/share/hostap
-	$(INSTALL_DATA) ./files/hostapd.uc $(1)/usr/share/hostap/
 	$(if $(findstring full,$(CONFIG_VARIANT)),$(Install/hostapd/full))
 endef
 
 define Install/supplicant
 	$(INSTALL_DIR) $(1)/usr/sbin $(1)/usr/share/hostap
-	$(INSTALL_DATA) ./files/wpa_supplicant.uc $(1)/usr/share/hostap/
 endef
 
 define Package/hostapd-common/install

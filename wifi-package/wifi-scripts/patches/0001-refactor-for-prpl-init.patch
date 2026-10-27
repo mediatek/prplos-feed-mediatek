@@ -1,0 +1,165 @@
+diff --git b/files/lib/wifi/mac80211.uc a/files/lib/wifi/mac80211.uc
+index 8617b4b..eb3fb2c 100644
+--- b/files/lib/wifi/mac80211.uc
++++ a/files/lib/wifi/mac80211.uc
+@@ -34,7 +34,6 @@ function radio_exists(path, macaddr, phy, radio) {
+ }
+ 
+ for (let phy_name, phy in board.wlan) {
+-	let init_mld;
+ 	let info = phy.info;
+ 	let has_mlo = false;
+ 
+@@ -125,9 +124,6 @@ for (let phy_name, phy in board.wlan) {
+ 		if (length(info.radios) > 0)
+ 			id += `\nset ${s}.radio='${radio.index}'`;
+ 
+-		if (has_mlo)
+-			init_mld = true;
+-
+ 		let disabled = getenv("MT76_ENV_WM_TM") ? 1 : 0;
+ 		let noscan = 0;
+ 		let mbssid = 0;
+@@ -136,22 +132,26 @@ for (let phy_name, phy in board.wlan) {
+ 		let encryption = "none";
+ 		let mbo = 0;
+ 		let ssid = "";
++		let ssid_bh = "";
+ 		let assocresp_elements="dd07000ce700000000";
+ 
+ 		if (band_name == "6g") {
+ 			encryption = "sae";
+ 			mbo = 1;
+-			ssid = "OpenWrt-6g";
++			ssid = "prplOS-6g";
++			ssid_bh = "prplOSbh-6g";
+ 			mbssid = 1;
+ 		} else if (band_name == "5g") {
+ 			noscan = 1;
+ 			rnr = 1;
+ 			background_radar = 1;
+-			ssid = "OpenWrt-5g";
++			ssid = "prplOS-5g";
++			ssid_bh = "prplOSbh-5g";
+ 		} else {
+ 			noscan = 1;
+ 			rnr = 1;
+-			ssid = "OpenWrt-2g";
++			ssid = "prplOS-2g";
++			ssid_bh = "prplOSbh-2g";
+ 		}
+ 
+ 		print(`set ${s}=wifi-device
+@@ -193,42 +193,23 @@ set ${si}.assocresp_elements='${assocresp_elements}'
+ set ${si}.sae_pwe=2
+ set ${si}.ieee80211w=2
+ `);
+-		if (random_mac_bytes) {
++		if (random_mac_bytes)
+ 			print(`set ${si}.macaddr=00:0${idx}:55:66${random_mac_bytes}
+ `);
+-			if (has_mlo)
+-				print(`set ${si_mld}.macaddr=00:1${idx}:55:66${random_mac_bytes}
++
++		let si_bh = si + "_bh";
++		print(`set ${si_bh}=wifi-iface
++set ${si_bh}.device='${name}'
++set ${si_bh}.network='lan'
++set ${si_bh}.mode='ap'
++set ${si_bh}.ssid=${ssid_bh}
+ `);
+-		}
+ 
+ 		config[name] = {};
+ 		push(device_list, name);
+ 		commit = true;
+ 	}
+ 
+-	if (init_mld) {
+-		let mld_sec = "wireless.ap_mld_1";
+-
+-		print(`set ${mld_sec}=wifi-iface
+-`);
+-		for (let device_name in device_list)
+-			print(`add_list ${mld_sec}.device=${device_name}
+-`);
+-
+-		print(`set ${mld_sec}.ifname=ap-mld-1
+-set ${mld_sec}.network='lan'
+-set ${mld_sec}.mode='ap'
+-set ${mld_sec}.mlo=1
+-set ${mld_sec}.ssid='MT76_AP_MLD'
+-set ${mld_sec}.encryption='sae-mixed'
+-set ${mld_sec}.key=12345678
+-set ${mld_sec}.sae_pwe=2
+-`);
+-		if (random_mac_bytes)
+-			print(`set ${mld_sec}.mld_addr=00:22:55:66${random_mac_bytes}
+-`);
+-	}
+-
+ 	commit = true;
+ }
+ 
+diff --git b/files/sbin/wifi a/files/sbin/wifi
+index ea6cb25..e633be6 100755
+--- b/files/sbin/wifi
++++ a/files/sbin/wifi
+@@ -66,7 +66,6 @@ wifi_config() {
+ 	sleep 1
+ 
+ 	[ -e /tmp/.config_pending ] && return
+-	ucode /usr/share/hostap/wifi-detect.uc
+ 
+ 	if (dmesg | grep -q "WM_TM"); then
+ 		export MT76_ENV_WM_TM=1
+@@ -85,8 +84,12 @@ wifi_config() {
+ 		export MT76_ENV_RANDOM_MAC_BYTES=${macaddr}
+ 	fi
+ 
++	[ -e /etc/config/wireless ] && return
++
+ 	[ ! -f /etc/config/wireless ] && touch /etc/config/wireless
++	/sbin/wireless-filogic
+ 	sleep 1
++	ucode /usr/share/hostap/wifi-detect.uc
+ 	ucode /lib/wifi/mac80211.uc | uci -q batch
+ 
+ 	for driver in $DRIVERS; do (
+diff --git b/files/sbin/wireless-filogic a/files/sbin/wireless-filogic
+new file mode 100755
+index 0000000..cbb577a
+--- /dev/null
++++ a/files/sbin/wireless-filogic
+@@ -0,0 +1,31 @@
++#!/bin/sh
++
++wait_for_uci_wireless() {
++	local timeout=10
++	local elapsed=0
++	local uci_detect
++
++	uci_detect=$(uci show wireless > /dev/null 2>/dev/null;echo $?)
++
++	while [ "$uci_detect" -ne "0" ] && [ $elapsed -lt $timeout ]; do
++		uci_detect=$(uci show wireless > /dev/null 2>/dev/null;echo $?)
++		elapsed=$((elapsed + 1))
++		sleep 1
++	done
++}
++
++init_vendor_uci_wireless() {
++	uci get wireless.vendor 1>/dev/null 2>/dev/null || {
++		uci set wireless.vendor=vendor
++	}
++
++	uci  set wireless.vendor.min_phy=3
++	uci  set wireless.vendor.phy_detect_timeout=10
++	uci commit wireless
++}
++
++wait_for_uci_wireless
++init_vendor_uci_wireless
++
++exit 0
++
